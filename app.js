@@ -266,7 +266,11 @@ function initMonthSelector() {
   // Gera opções de 12 meses atrás a 12 meses no futuro
   for (let i = -12; i <= 12; i++) {
     const date = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
-    const value = date.toISOString().slice(0, 7); // "YYYY-MM"
+    
+    // Evita timezone shifts gerando a string localmente
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const value = `${year}-${month}`;
     
     const label = date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
     const capitalizedLabel = label.charAt(0).toUpperCase() + label.slice(1);
@@ -289,7 +293,10 @@ function updateMonthLabels() {
   const sidebarMonth = document.querySelector("#sidebarMonth");
   const historyMonthLabel = document.querySelector("#historyMonthLabel");
   
-  const date = new Date(`${selectedMonth}-02T00:00:00`); // Evita problemas de fuso horário
+  // Cria data segura localmente
+  const [y, m] = selectedMonth.split("-").map(Number);
+  const date = new Date(y, m - 1, 2);
+  
   const label = date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   const capitalizedLabel = label.charAt(0).toUpperCase() + label.slice(1);
   
