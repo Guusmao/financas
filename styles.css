@@ -1,0 +1,521 @@
+:root {
+  --ink: #1f2933;
+  --muted: #667085;
+  --line: #d8dee9;
+  --paper: #f6f7fb;
+  --panel: #ffffff;
+  --blue: #5b9bd5;
+  --gold: #c89f37;
+  --green: #5fa46b;
+  --red: #d76b6b;
+  --teal: #4a9f9a;
+  --shadow: 0 16px 40px rgba(31, 41, 51, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: Calibri, "Segoe UI", Arial, sans-serif;
+  letter-spacing: 0;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+.app-shell {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 24px 18px;
+  color: #fff;
+  background: linear-gradient(180deg, #3f6f9f 0%, #294962 100%);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-mark {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.75);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.brand h1,
+.brand p,
+.page-header h2,
+.page-header p,
+.panel h3 {
+  margin: 0;
+}
+
+.brand h1 {
+  font-size: 23px;
+}
+
+.brand p {
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 14px;
+}
+
+.nav-tabs {
+  display: grid;
+  gap: 8px;
+}
+
+.nav-tab {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.07);
+  text-align: left;
+  cursor: pointer;
+}
+
+.nav-tab.active,
+.nav-tab:hover {
+  color: #123047;
+  background: #ffffff;
+}
+
+.sidebar-footer {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.icon-button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+}
+
+.icon-button.danger {
+  color: #ffe5e5;
+}
+
+.main {
+  min-width: 0;
+  padding: 28px;
+}
+
+.view {
+  display: none;
+}
+
+.view.active {
+  display: block;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+}
+
+.page-header h2 {
+  color: #1e5d8f;
+  font-size: 28px;
+}
+
+.page-header p {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.month-pill {
+  min-width: 126px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  text-align: right;
+}
+
+.month-pill span {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.summary-card {
+  min-height: 104px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.summary-card span {
+  display: block;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.summary-card strong {
+  display: block;
+  margin-top: 12px;
+  font-size: 28px;
+}
+
+.summary-card.income {
+  border-top: 5px solid var(--green);
+}
+
+.summary-card.expense {
+  border-top: 5px solid var(--red);
+}
+
+.summary-card.reserve {
+  border-top: 5px solid var(--gold);
+}
+
+.summary-card.balance {
+  border-top: 5px solid var(--blue);
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.panel {
+  min-width: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.fixed-panel,
+.spending-panel,
+.goals-panel,
+.reserve-panel {
+  grid-column: span 6;
+}
+
+.history-panel {
+  grid-column: span 12;
+}
+
+.panel-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-title h3 {
+  font-size: 18px;
+}
+
+.panel-title span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.compact-list,
+.goal-list,
+.cards-list {
+  display: grid;
+  gap: 10px;
+}
+
+.list-row,
+.data-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fbfcfe;
+}
+
+.list-row small,
+.data-card small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+.amount {
+  font-weight: 700;
+}
+
+.status {
+  justify-self: end;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.status.ok {
+  color: #236232;
+  background: #e4f4e8;
+}
+
+.status.warn {
+  color: #8a520f;
+  background: #fff0d2;
+}
+
+.reserve-total {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  padding: 12px;
+  border-radius: 6px;
+  background: #fff8e2;
+}
+
+.reserve-total span {
+  color: var(--muted);
+}
+
+.reserve-total strong {
+  font-size: 24px;
+}
+
+.mini-table {
+  display: grid;
+  gap: 8px;
+}
+
+.bar-chart {
+  display: grid;
+  gap: 12px;
+}
+
+.bar-chart > div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+}
+
+.bar {
+  height: 18px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: #edf1f6;
+}
+
+.bar i {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--blue);
+  transition: width 0.2s ease;
+}
+
+.entry-form {
+  display: grid;
+  grid-template-columns: 140px 130px 160px minmax(180px, 1fr) 140px 120px 96px 150px 120px;
+  gap: 10px;
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.entry-form.compact {
+  grid-template-columns: repeat(6, minmax(120px, 1fr)) 120px;
+}
+
+.entry-form input,
+.entry-form select {
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid #cfd7e3;
+  border-radius: 6px;
+  background: #fff;
+}
+
+.check-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  color: var(--muted);
+}
+
+.check-field input {
+  width: 16px;
+  height: 16px;
+}
+
+.entry-form button,
+.row-action {
+  min-height: 40px;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  background: #2f75a8;
+  cursor: pointer;
+}
+
+.row-action {
+  min-height: 32px;
+  padding: 0 10px;
+  background: #9b3f3f;
+}
+
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+th,
+td {
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: #fff;
+  background: #7e5a11;
+}
+
+td {
+  background: #fff;
+}
+
+.progress {
+  height: 8px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: #e8edf3;
+}
+
+.progress i {
+  display: block;
+  height: 100%;
+  background: var(--teal);
+}
+
+@media (max-width: 980px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .nav-tabs {
+    grid-template-columns: repeat(5, minmax(112px, 1fr));
+    overflow-x: auto;
+  }
+
+  .summary-grid,
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fixed-panel,
+  .spending-panel,
+  .goals-panel,
+  .reserve-panel,
+  .history-panel {
+    grid-column: span 1;
+  }
+
+  .entry-form,
+  .entry-form.compact {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .main {
+    padding: 18px;
+  }
+
+  .page-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .summary-grid,
+  .entry-form,
+  .entry-form.compact {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-card strong {
+    font-size: 24px;
+  }
+}
