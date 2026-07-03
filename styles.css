@@ -171,6 +171,25 @@ select {
   font-size: 12px;
 }
 
+.month-select {
+  border: 0;
+  font-weight: 700;
+  font-size: 16px;
+  color: #1e5d8f;
+  outline: none;
+  cursor: pointer;
+  background: transparent;
+  width: 100%;
+  text-align: right;
+  padding: 0;
+  margin: 0;
+  display: block;
+  font-family: inherit;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

@@ -42,6 +42,7 @@ let state = {
   reserve: [],
 };
 let user = null;
+let selectedMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
 
 function money(value) {
   return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -56,6 +57,14 @@ function todayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function getDefaultDateForInput() {
+  const today = todayIso();
+  if (today.startsWith(selectedMonth)) {
+    return today;
+  }
+  return `${selectedMonth}-01`;
+}
+
 function fillSelect(select, options) {
   select.innerHTML = options.map((item) => `<option>${item}</option>`).join("");
 }
@@ -64,18 +73,34 @@ function initForms() {
   document.querySelectorAll('select[name="category"]').forEach((select) => fillSelect(select, config.categories));
   document.querySelectorAll('select[name="payment"]').forEach((select) => fillSelect(select, config.payments));
   document.querySelectorAll('input[type="date"]').forEach((input) => {
-    if (!input.value) input.value = todayIso();
+    input.value = getDefaultDateForInput();
   });
 }
 
 function totals() {
-  const entries = state.entries.filter((entry) => entry.paid);
-  const entradas = entries.filter((entry) => entry.type === "Entrada").reduce((sum, entry) => sum + Number(entry.amount), 0);
-  const saidas = entries.filter((entry) => entry.type === "Saída").reduce((sum, entry) => sum + Number(entry.amount), 0);
-  const reservaLancamentos = entries.filter((entry) => entry.type === "Reserva").reduce((sum, entry) => sum + Number(entry.amount), 0);
-  const reservaMovimentos = state.reserve.reduce((sum, item) => sum + (item.type === "Entrada" ? Number(item.amount) : -Number(item.amount)), 0);
-  const reserva = reservaLancamentos + reservaMovimentos;
-  return { entradas, saidas, reserva, saldo: entradas - saidas - reserva };
+  // Filtra lançamentos do mês selecionado
+  const monthlyEntries = state.entries.filter((entry) => entry.paid && entry.date.startsWith(selectedMonth));
+  const entradas = monthlyEntries.filter((entry) => entry.type === "Entrada").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const saidas = monthlyEntries.filter((entry) => entry.type === "Saída").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  
+  // Reserva do mês: lançamentos de Reserva + movimentos de reserva do mês
+  const reservaLancamentosMes = monthlyEntries.filter((entry) => entry.type === "Reserva").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const reservaMovimentosMes = state.reserve.filter((item) => item.date.startsWith(selectedMonth)).reduce((sum, item) => sum + (item.type === "Entrada" ? Number(item.amount) : -Number(item.amount)), 0);
+  const reservaMes = reservaLancamentosMes + reservaMovimentosMes;
+  
+  // Reserva acumulada (todos os tempos)
+  const allPaidEntries = state.entries.filter((entry) => entry.paid);
+  const reservaLancamentosAcumulado = allPaidEntries.filter((entry) => entry.type === "Reserva").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const reservaMovimentosAcumulado = state.reserve.reduce((sum, item) => sum + (item.type === "Entrada" ? Number(item.amount) : -Number(item.amount)), 0);
+  const reservaAcumulada = reservaLancamentosAcumulado + reservaMovimentosAcumulado;
+
+  return { 
+    entradas, 
+    saidas, 
+    reserva: reservaAcumulada, // total acumulado na reserva
+    reservaMes, // total movimentado na reserva neste mês
+    saldo: entradas - saidas - reservaMes 
+  };
 }
 
 function renderDashboard() {
@@ -86,18 +111,23 @@ function renderDashboard() {
   document.querySelector("#saldoAtual").textContent = money(total.saldo);
   document.querySelector("#todayLabel").textContent = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
 
-  const paidCategories = new Set(state.entries.filter((entry) => entry.paid).map((entry) => entry.category));
+  // Contas fixas pagas/pendentes baseadas apenas no mês selecionado
+  const monthlyPaidEntries = state.entries.filter((entry) => entry.paid && entry.date.startsWith(selectedMonth));
+  const paidCategories = new Set(monthlyPaidEntries.map((entry) => entry.category));
+  const paidDescriptions = new Set(monthlyPaidEntries.map((entry) => entry.description));
+  
   const bills = state.bills.filter((bill) => bill.active);
   document.querySelector("#contasStatus").textContent = `${bills.length} ativas`;
   document.querySelector("#dashboardContas").innerHTML = bills.map((bill) => {
-    const paid = paidCategories.has(bill.name) || paidCategories.has(bill.category);
+    const paid = paidCategories.has(bill.name) || paidCategories.has(bill.category) || paidDescriptions.has(bill.name);
     return `<div class="list-row">
       <div><strong>${bill.name}</strong><small>${bill.category} · vence dia ${bill.dueDay}</small></div>
       <div><span class="amount">${money(bill.amount)}</span><span class="status ${paid ? "ok" : "warn"}">${paid ? "Pago" : "Pendente"}</span></div>
     </div>`;
   }).join("") || emptyRow("Nenhuma conta fixa");
 
-  const gastos = state.entries.filter((entry) => entry.type === "Saída").slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+  // Gastos do mês selecionado
+  const gastos = state.entries.filter((entry) => entry.type === "Saída" && entry.date.startsWith(selectedMonth)).slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
   document.querySelector("#gastosStatus").textContent = `${gastos.length} recentes`;
   document.querySelector("#dashboardGastos").innerHTML = gastos.map((entry) => `<div class="list-row">
     <div><strong>${entry.description}</strong><small>${dateLabel(entry.date)} · ${entry.category} · ${entry.payment}</small></div>
@@ -108,16 +138,17 @@ function renderDashboard() {
   document.querySelector("#dashboardMetas").innerHTML = state.goals.map(goalCard).join("") || emptyRow("Nenhuma meta cadastrada");
 
   document.querySelector("#dashboardReserva").textContent = money(total.reserva);
-  document.querySelector("#reservaStatus").textContent = `${state.reserve.length} movimentos`;
-  document.querySelector("#dashboardReservaMovimentos").innerHTML = state.reserve.slice(-4).reverse().map((item) => `<div class="list-row">
+  const reserveMonth = state.reserve.filter((item) => item.date.startsWith(selectedMonth));
+  document.querySelector("#reservaStatus").textContent = `${reserveMonth.length} movimentos`;
+  document.querySelector("#dashboardReservaMovimentos").innerHTML = reserveMonth.slice(-4).reverse().map((item) => `<div class="list-row">
     <div><strong>${dateLabel(item.date)}</strong><small>${item.note || item.type}</small></div>
     <span class="amount">${item.type === "Saída" ? "-" : ""}${money(item.amount)}</span>
   </div>`).join("") || emptyRow("Sem movimentos");
 
-  const max = Math.max(total.entradas, total.saidas, total.reserva, 1);
+  const max = Math.max(total.entradas, total.saidas, total.reservaMes, 1);
   document.querySelector("#barEntradas").style.width = `${(total.entradas / max) * 100}%`;
   document.querySelector("#barSaidas").style.width = `${(total.saidas / max) * 100}%`;
-  document.querySelector("#barReserva").style.width = `${(total.reserva / max) * 100}%`;
+  document.querySelector("#barReserva").style.width = `${(total.reservaMes / max) * 100}%`;
 }
 
 function emptyRow(text) {
@@ -139,7 +170,8 @@ function goalCard(goal) {
 }
 
 function renderEntries() {
-  const rows = state.entries.slice().sort((a, b) => b.date.localeCompare(a.date)).map((entry) => `<tr>
+  // Filtra lançamentos exibidos na tabela de lançamentos por mês ativo
+  const rows = state.entries.filter((entry) => entry.date.startsWith(selectedMonth)).slice().sort((a, b) => b.date.localeCompare(a.date)).map((entry) => `<tr>
     <td>${dateLabel(entry.date)}</td>
     <td>${entry.type}</td>
     <td>${entry.category}</td>
@@ -159,12 +191,14 @@ function renderBills() {
   </div>`).join("");
 }
 
+// Goals and Reserve logic
 function renderGoals() {
   document.querySelector("#metasList").innerHTML = state.goals.map(goalCard).join("");
 }
 
 function renderReserve() {
-  document.querySelector("#reservaTable").innerHTML = state.reserve.slice().sort((a, b) => b.date.localeCompare(a.date)).map((item) => `<tr>
+  // Filtra movimentações de reserva por mês ativo
+  document.querySelector("#reservaTable").innerHTML = state.reserve.filter((item) => item.date.startsWith(selectedMonth)).slice().sort((a, b) => b.date.localeCompare(a.date)).map((item) => `<tr>
     <td>${dateLabel(item.date)}</td>
     <td>${money(item.amount)}</td>
     <td>${item.type}</td>
@@ -221,6 +255,48 @@ async function loadData() {
   }
 }
 
+// Month Selector Initialization
+function initMonthSelector() {
+  const selector = document.querySelector("#monthSelector");
+  if (!selector) return;
+
+  const options = [];
+  const currentDate = new Date();
+  
+  // Gera opções de 12 meses atrás a 12 meses no futuro
+  for (let i = -12; i <= 12; i++) {
+    const date = new Date(currentDate.getFullYear(), currentDate.getMonth() + i, 1);
+    const value = date.toISOString().slice(0, 7); // "YYYY-MM"
+    
+    const label = date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+    const capitalizedLabel = label.charAt(0).toUpperCase() + label.slice(1);
+    
+    options.push({ value, label: capitalizedLabel });
+  }
+
+  selector.innerHTML = options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join("");
+  selector.value = selectedMonth;
+
+  selector.addEventListener("change", (e) => {
+    selectedMonth = e.target.value;
+    updateMonthLabels();
+    initForms(); // Atualiza data padrão dos formulários
+    render();
+  });
+}
+
+function updateMonthLabels() {
+  const sidebarMonth = document.querySelector("#sidebarMonth");
+  const historyMonthLabel = document.querySelector("#historyMonthLabel");
+  
+  const date = new Date(`${selectedMonth}-02T00:00:00`); // Evita problemas de fuso horário
+  const label = date.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const capitalizedLabel = label.charAt(0).toUpperCase() + label.slice(1);
+  
+  if (sidebarMonth) sidebarMonth.textContent = capitalizedLabel;
+  if (historyMonthLabel) historyMonthLabel.textContent = capitalizedLabel.split(" de ")[0];
+}
+
 // Auth Management
 async function checkAuth() {
   if (!supabase) return;
@@ -234,6 +310,13 @@ async function checkAuth() {
     authScreen.classList.add("hidden");
     appShell.classList.remove("hidden");
     authError.classList.add("hidden");
+    
+    // Inicializar o seletor de meses uma única vez
+    if (!document.querySelector("#monthSelector").children.length) {
+      initMonthSelector();
+      updateMonthLabels();
+    }
+
     await loadData();
   } else {
     user = null;
