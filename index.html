@@ -32,6 +32,7 @@
             <input id="importData" type="file" accept="application/json" hidden />
           </label>
           <button id="resetData" class="icon-button danger" type="button" title="Restaurar exemplo">↺</button>
+          <button id="logoutBtn" class="icon-button danger" type="button" title="Sair da conta">⏻</button>
         </div>
       </aside>
 
@@ -242,6 +243,32 @@
       </main>
     </div>
 
-    <script src="app.js"></script>
+    <div id="auth-screen" class="auth-screen hidden">
+      <div class="auth-card">
+        <div class="auth-header">
+          <div class="brand-mark">$</div>
+          <h2>Finanças Pessoais</h2>
+          <p id="auth-subtitle">Entre na sua conta para sincronizar seus dados</p>
+        </div>
+        <form id="auth-form" class="auth-form">
+          <div class="form-group">
+            <label for="auth-email">E-mail</label>
+            <input id="auth-email" type="email" name="email" placeholder="seu@email.com" required />
+          </div>
+          <div class="form-group">
+            <label for="auth-password">Senha</label>
+            <input id="auth-password" type="password" name="password" placeholder="••••••••" required />
+          </div>
+          <button id="auth-submit-btn" type="submit">Entrar</button>
+        </form>
+        <div class="auth-switch">
+          <span id="auth-switch-text">Ainda não tem conta?</span>
+          <button id="auth-toggle-btn" type="button">Criar conta</button>
+        </div>
+        <div id="auth-error" class="auth-error hidden"></div>
+      </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
   </body>
 </html>

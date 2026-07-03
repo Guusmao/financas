@@ -519,3 +519,144 @@ td {
     font-size: 24px;
   }
 }
+
+/* Auth Screen Styles */
+.hidden {
+  display: none !important;
+}
+
+.auth-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3f6f9f 0%, #123047 100%);
+  z-index: 9999;
+  padding: 20px;
+}
+
+.auth-card {
+  background: #ffffff;
+  width: 100%;
+  max-width: 400px;
+  border-radius: 12px;
+  padding: 36px 32px;
+  box-shadow: 0 24px 64px rgba(18, 48, 71, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.auth-header .brand-mark {
+  border-color: #3f6f9f;
+  color: #3f6f9f;
+  background: rgba(63, 111, 159, 0.08);
+}
+
+.auth-header h2 {
+  margin: 0;
+  font-size: 24px;
+  color: #123047;
+}
+
+.auth-header p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-group label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.form-group input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #cfd7e3;
+  border-radius: 6px;
+  background: #fff;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #3f6f9f;
+  box-shadow: 0 0 0 3px rgba(63, 111, 159, 0.15);
+}
+
+#auth-submit-btn {
+  height: 44px;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  background: #2f75a8;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-top: 8px;
+}
+
+#auth-submit-btn:hover {
+  background: #1e5d8f;
+}
+
+.auth-switch {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+#auth-toggle-btn {
+  border: 0;
+  background: none;
+  color: #2f75a8;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 4px;
+  text-decoration: underline;
+}
+
+#auth-toggle-btn:hover {
+  color: #1e5d8f;
+}
+
+.auth-error {
+  margin-top: 18px;
+  padding: 12px;
+  background: #ffebeb;
+  border: 1px solid #ffd1d1;
+  color: #c93b3b;
+  border-radius: 6px;
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: center;
+}
