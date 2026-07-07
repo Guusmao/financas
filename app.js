@@ -318,7 +318,7 @@ function fillSelect(select, options) {
 
 function setupMoneyInputs() {
   const moneyInputs = document.querySelectorAll(
-    'input[name="amount"], input[name="target"], input[name="saved"], #driverUber, #driver99, #driverGasolina'
+    'input[name="amount"], input[name="target"], input[name="saved"], #driverUber, #driver99, #driverGasolina, #driverKm, #driverConsumo'
   );
 
   moneyInputs.forEach((input) => {
@@ -922,9 +922,9 @@ document.querySelector("#driverForm").addEventListener("submit", async (event) =
     data: document.querySelector("#driverData").value,
     uber: normalizeAmount(document.querySelector("#driverUber").value || 0),
     noventa_nove: normalizeAmount(document.querySelector("#driver99").value || 0),
-    quilometragem: Number(document.querySelector("#driverKm").value || 0),
+    quilometragem: normalizeAmount(document.querySelector("#driverKm").value || 0),
     preco_gasolina: normalizeAmount(document.querySelector("#driverGasolina").value || 0),
-    consumo_veiculo: Number(document.querySelector("#driverConsumo").value || 0)
+    consumo_veiculo: normalizeAmount(document.querySelector("#driverConsumo").value || 0)
   };
 
   const { error } = await supabase
