@@ -26,8 +26,6 @@ const seed = {
   reserve: [],
 };
 
-const CUSTOM_TAB_PREFIX = "custom-tab-";
-
 // Supabase Client Setup
 const viteEnv = import.meta.env || {};
 const runtimeConfig = window.__APP_CONFIG__ || {};
@@ -48,8 +46,6 @@ let state = {
   goals: [],
   reserve: [],
   motorista: [],
-  customTabs: [],
-  customTabEntries: [],
 };
 
 let user = null;
@@ -77,21 +73,6 @@ function getDefaultDateForInput() {
   return `${selectedMonth}-01`;
 }
 
-function normalizeTabName(name) {
-  return String(name || "")
-    .trim()
-    .slice(0, 40);
-}
-
-function slugifyTabName(name) {
-  return normalizeTabName(name)
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 function escapeHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -105,31 +86,6 @@ function normalizeTextInput(value, maxLength = 120) {
   return String(value || "")
     .trim()
     .slice(0, maxLength);
-}
-
-function normalizeCustomTabId(rawId, fallbackBase = "aba") {
-  const safeCore = String(rawId || "")
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, "")
-    .slice(0, 80);
-
-  if (safeCore.startsWith(CUSTOM_TAB_PREFIX) && safeCore.length > CUSTOM_TAB_PREFIX.length) {
-    return safeCore;
-  }
-
-  const safeFallback = String(fallbackBase || "aba")
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, "")
-    .slice(0, 40) || "aba";
-
-  return `${CUSTOM_TAB_PREFIX}${safeFallback}-${Date.now()}`;
-}
-
-function normalizeCustomEntryId(rawId) {
-  const safe = String(rawId || "")
-    .replace(/[^a-zA-Z0-9-_]/g, "")
-    .slice(0, 80);
-  return safe || crypto.randomUUID();
 }
 
 function normalizeAmount(value) {
@@ -260,94 +216,6 @@ async function ensureInstallmentsForMonth() {
   }
 }
 
-function sanitizeCustomTabsState(tabsInput, entriesInput) {
-  const tabsRaw = Array.isArray(tabsInput) ? tabsInput : [];
-  const tabs = [];
-  const seenTabIds = new Set();
-
-  tabsRaw.forEach((tab) => {
-    const name = normalizeTabName(tab?.name) || "Nova aba";
-    let id = normalizeCustomTabId(tab?.id, slugifyTabName(name) || "aba");
-    if (seenTabIds.has(id)) {
-      id = `${id}-${Math.floor(Math.random() * 10000)}`;
-    }
-    seenTabIds.add(id);
-    tabs.push({ id, name });
-  });
-
-  const validTabIds = new Set(tabs.map((tab) => tab.id));
-  const entriesRaw = Array.isArray(entriesInput) ? entriesInput : [];
-  const entries = entriesRaw
-    .filter((entry) => validTabIds.has(entry?.tabId))
-    .map((entry) => ({
-      id: normalizeCustomEntryId(entry?.id),
-      tabId: entry.tabId,
-      date: String(entry?.date || getDefaultDateForInput()).slice(0, 10),
-      type: entry?.type === "Saída" ? "Saída" : "Entrada",
-      description: normalizeTextInput(entry?.description, 120),
-      amount: normalizeAmount(entry?.amount),
-      note: normalizeTextInput(entry?.note, 240),
-    }));
-
-  return { tabs, entries };
-}
-
-function customTabsStorageKey() {
-  return user ? `financas-custom-tabs-${user.id}` : null;
-}
-
-function customTabEntriesStorageKey() {
-  return user ? `financas-custom-tab-entries-${user.id}` : null;
-}
-
-function saveCustomTabsState() {
-  const tabsKey = customTabsStorageKey();
-  const entriesKey = customTabEntriesStorageKey();
-  if (!tabsKey || !entriesKey) return;
-
-  localStorage.setItem(tabsKey, JSON.stringify(state.customTabs));
-  localStorage.setItem(entriesKey, JSON.stringify(state.customTabEntries));
-}
-
-function loadCustomTabsState() {
-  const tabsKey = customTabsStorageKey();
-  const entriesKey = customTabEntriesStorageKey();
-  if (!tabsKey || !entriesKey) {
-    state.customTabs = [];
-    state.customTabEntries = [];
-    return;
-  }
-
-  try {
-    const tabs = JSON.parse(localStorage.getItem(tabsKey) || "[]");
-    const entries = JSON.parse(localStorage.getItem(entriesKey) || "[]");
-    const sanitized = sanitizeCustomTabsState(tabs, entries);
-
-    state.customTabs = sanitized.tabs;
-    state.customTabEntries = sanitized.entries;
-  } catch {
-    state.customTabs = [];
-    state.customTabEntries = [];
-  }
-}
-
-function customTabMonthTotals(tabId) {
-  const rows = state.customTabEntries.filter((entry) => entry.tabId === tabId && entry.date.startsWith(selectedMonth));
-  const entradas = rows
-    .filter((entry) => entry.type === "Entrada")
-    .reduce((sum, entry) => sum + Number(entry.amount), 0);
-  const saidas = rows
-    .filter((entry) => entry.type === "Saída")
-    .reduce((sum, entry) => sum + Number(entry.amount), 0);
-
-  return {
-    total: rows.length,
-    entradas,
-    saidas,
-    saldo: entradas - saidas,
-  };
-}
-
 function fillSelect(select, options) {
   select.innerHTML = options.map((item) => `<option>${item}</option>`).join("");
 }
@@ -462,22 +330,6 @@ function renderDashboard() {
   document.querySelector("#barSaidas").style.width = `${(total.saidas / max) * 100}%`;
   document.querySelector("#barReserva").style.width = `${(total.reservaMes / max) * 100}%`;
 
-  renderCustomTabsDashboard();
-}
-
-function renderCustomTabsDashboard() {
-  const statusEl = document.querySelector("#customTabsStatus");
-  const listEl = document.querySelector("#dashboardCustomTabs");
-  if (!statusEl || !listEl) return;
-
-  statusEl.textContent = `${state.customTabs.length} abas`;
-  listEl.innerHTML = state.customTabs.map((tab) => {
-    const totals = customTabMonthTotals(tab.id);
-    return `<div class="list-row">
-      <div><strong>${escapeHtml(tab.name)}</strong><small>${totals.total} registros no mês</small></div>
-      <span class="amount">${money(totals.saldo)}</span>
-    </div>`;
-  }).join("") || emptyRow("Nenhuma aba personalizada");
 }
 
 function emptyRow(text) {
@@ -548,89 +400,6 @@ function renderReserve() {
   </tr>`).join("");
 }
 
-function renderCustomTabsNav() {
-  const navHost = document.querySelector("#dynamicTabsNav");
-  if (!navHost) return;
-
-  navHost.innerHTML = state.customTabs
-    .map((tab) => `<button class="nav-tab dynamic-tab" data-tab="${tab.id}" type="button">${escapeHtml(tab.name)}</button>`)
-    .join("");
-}
-
-function renderCustomTabsManagerList() {
-  const listEl = document.querySelector("#customTabsList");
-  if (!listEl) return;
-
-  listEl.innerHTML = state.customTabs.map((tab) => {
-    const totals = customTabMonthTotals(tab.id);
-    return `<div class="data-card">
-      <div>
-        <strong>${escapeHtml(tab.name)}</strong>
-        <small>${totals.total} registros neste mês · saldo ${money(totals.saldo)}</small>
-      </div>
-      <button class="row-action" data-delete-custom-tab="${tab.id}" type="button">Excluir</button>
-    </div>`;
-  }).join("") || emptyRow("Nenhuma aba criada ainda");
-}
-
-function renderCustomTabViews() {
-  const viewsHost = document.querySelector("#dynamicViewsContainer");
-  if (!viewsHost) return;
-
-  viewsHost.innerHTML = state.customTabs.map((tab) => {
-    const rows = state.customTabEntries
-      .filter((entry) => entry.tabId === tab.id && entry.date.startsWith(selectedMonth))
-      .slice()
-      .sort((a, b) => b.date.localeCompare(a.date));
-
-    return `<section id="${tab.id}" class="view">
-      <header class="page-header">
-        <div>
-          <h2>${escapeHtml(tab.name)}</h2>
-          <p>Lançamentos personalizados</p>
-        </div>
-      </header>
-
-      <form class="entry-form compact custom-tab-entry-form" data-custom-tab-id="${tab.id}">
-        <input type="date" name="date" value="${getDefaultDateForInput()}" required />
-        <select name="type" required>
-          <option>Entrada</option>
-          <option>Saída</option>
-        </select>
-        <input name="description" placeholder="Descrição" required />
-        <input name="amount" type="number" step="0.01" min="0" placeholder="Valor" required />
-        <input name="note" placeholder="Observação" />
-        <button type="submit">Adicionar</button>
-      </form>
-
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Data</th>
-              <th>Tipo</th>
-              <th>Descrição</th>
-              <th>Valor</th>
-              <th>Observação</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rows.map((entry) => `<tr>
-              <td>${dateLabel(entry.date)}</td>
-              <td>${escapeHtml(entry.type)}</td>
-              <td>${escapeHtml(entry.description)}</td>
-              <td>${money(entry.amount)}</td>
-              <td>${escapeHtml(entry.note || "")}</td>
-              <td><button class="row-action" data-delete-custom-entry="${entry.id}" type="button">Excluir</button></td>
-            </tr>`).join("")}
-          </tbody>
-        </table>
-      </div>
-    </section>`;
-  }).join("");
-}
-
 function switchTab(tabId) {
   const targetView = document.getElementById(tabId);
   if (!targetView) return;
@@ -642,9 +411,6 @@ function switchTab(tabId) {
 }
 
 function render() {
-  renderCustomTabsNav();
-  renderCustomTabViews();
-  renderCustomTabsManagerList();
   renderDashboard();
   renderEntries();
   renderBills();
@@ -701,8 +467,6 @@ async function loadData() {
       preco_gasolina: Number(item.preco_gasolina),
       consumo_veiculo: Number(item.consumo_veiculo)
     }));
-
-    loadCustomTabsState();
 
     await ensureInstallmentsForMonth();
 
@@ -786,8 +550,6 @@ async function checkAuth() {
     await loadData();
   } else {
     user = null;
-    state.customTabs = [];
-    state.customTabEntries = [];
     authScreen.classList.remove("hidden");
     appShell.classList.add("hidden");
   }
@@ -1035,57 +797,6 @@ document.querySelector("#reservaForm").addEventListener("submit", async (event) 
   }
 });
 
-document.querySelector("#customTabForm").addEventListener("submit", (event) => {
-  event.preventDefault();
-  if (!user) return;
-
-  const data = formData(event.currentTarget);
-  const name = normalizeTabName(data.name);
-  if (!name) {
-    alert("Informe um nome válido para a aba.");
-    return;
-  }
-
-  const slug = slugifyTabName(name);
-  const idBase = slug || `aba-${Date.now()}`;
-  const existing = new Set(state.customTabs.map((tab) => tab.id));
-  let id = normalizeCustomTabId(`${CUSTOM_TAB_PREFIX}${idBase}`, idBase);
-  let attempt = 1;
-  while (existing.has(id)) {
-    attempt += 1;
-    id = normalizeCustomTabId(`${CUSTOM_TAB_PREFIX}${idBase}-${attempt}`, `${idBase}-${attempt}`);
-  }
-
-  state.customTabs.push({ id, name });
-  saveCustomTabsState();
-  event.currentTarget.reset();
-  render();
-  switchTab(id);
-});
-
-document.body.addEventListener("submit", (event) => {
-  const form = event.target.closest(".custom-tab-entry-form");
-  if (!form || !user) return;
-
-  event.preventDefault();
-  const tabId = form.dataset.customTabId;
-  const data = formData(form);
-
-  state.customTabEntries.push({
-    id: normalizeCustomEntryId(crypto.randomUUID()),
-    tabId,
-    date: data.date,
-    type: data.type === "Saída" ? "Saída" : "Entrada",
-    description: normalizeTextInput(data.description, 120),
-    amount: normalizeAmount(data.amount),
-    note: normalizeTextInput(data.note, 240),
-  });
-
-  saveCustomTabsState();
-  render();
-  switchTab(tabId);
-});
-
 // ======================================================
 // MOTORISTA DE APLICATIVO
 // SALVAR REGISTRO
@@ -1191,26 +902,6 @@ document.body.addEventListener("click", async (event) => {
     return;
   }
 
-  const customEntryId = button.dataset.deleteCustomEntry;
-  if (customEntryId) {
-    if (!confirm("Tem certeza que deseja excluir este registro?")) return;
-    state.customTabEntries = state.customTabEntries.filter((item) => item.id !== customEntryId);
-    saveCustomTabsState();
-    render();
-    return;
-  }
-
-  const customTabId = button.dataset.deleteCustomTab;
-  if (customTabId) {
-    if (!confirm("Tem certeza que deseja excluir esta aba e seus registros?")) return;
-    state.customTabs = state.customTabs.filter((item) => item.id !== customTabId);
-    state.customTabEntries = state.customTabEntries.filter((item) => item.tabId !== customTabId);
-    saveCustomTabsState();
-    render();
-    switchTab("abas");
-    return;
-  }
-
   if (!supabase) return;
   
   const maps = [
@@ -1240,11 +931,7 @@ document.body.addEventListener("click", async (event) => {
 
 // Data Export / Import / Reset
 document.querySelector("#exportData").addEventListener("click", () => {
-  const exportState = {
-    ...state,
-    customTabs: state.customTabs,
-    customTabEntries: state.customTabEntries,
-  };
+  const exportState = { ...state };
   const blob = new Blob([JSON.stringify(exportState, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -1318,12 +1005,6 @@ document.querySelector("#importData").addEventListener("change", async (event) =
       consumo_veiculo: Number(m.consumo_veiculo)
     }));
 
-    const sanitizedCustomState = sanitizeCustomTabsState(imported.customTabs, imported.customTabEntries);
-    state.customTabs = sanitizedCustomState.tabs;
-    state.customTabEntries = sanitizedCustomState.entries;
-
-    saveCustomTabsState();
-
     await Promise.all([
       entries.length > 0 ? supabase.from('entries').insert(entries) : Promise.resolve(),
       bills.length > 0 ? supabase.from('bills').insert(bills) : Promise.resolve(),
@@ -1388,10 +1069,6 @@ document.querySelector("#resetData").addEventListener("click", async () => {
       bills.length > 0 ? supabase.from('bills').insert(bills) : Promise.resolve(),
       goals.length > 0 ? supabase.from('goals').insert(goals) : Promise.resolve()
     ]);
-
-    state.customTabs = [];
-    state.customTabEntries = [];
-    saveCustomTabsState();
 
     await loadData();
   } catch (err) {

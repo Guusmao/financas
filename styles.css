@@ -103,11 +103,6 @@ select {
   background: #ffffff;
 }
 
-#dynamicTabsNav {
-  display: grid;
-  gap: 8px;
-}
-
 .sidebar-footer {
   display: flex;
   gap: 8px;
@@ -437,10 +432,6 @@ select {
   grid-template-columns: repeat(6, minmax(120px, 1fr)) 120px;
 }
 
-#customTabForm {
-  grid-template-columns: minmax(220px, 1fr) 140px;
-}
-
 .driver-form {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
@@ -591,10 +582,6 @@ td {
   }
 
   .driver-form {
-    grid-template-columns: 1fr;
-  }
-
-  #customTabForm {
     grid-template-columns: 1fr;
   }
 
