@@ -396,6 +396,26 @@ select {
   grid-template-columns: repeat(6, minmax(120px, 1fr)) 120px;
 }
 
+.driver-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.driver-form .form-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.driver-form .form-grid input {
+  width: 100%;
+}
+
+.driver-form .primary {
+  padding: 0 18px;
+  white-space: nowrap;
+}
+
 .entry-form input,
 .entry-form select {
   min-width: 0;
@@ -516,6 +536,14 @@ td {
   .entry-form.compact {
     grid-template-columns: 1fr 1fr;
   }
+
+  .driver-form {
+    grid-template-columns: 1fr;
+  }
+
+  .driver-form .form-grid {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -532,6 +560,14 @@ td {
   .entry-form,
   .entry-form.compact {
     grid-template-columns: 1fr;
+  }
+
+  .driver-form .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .driver-form .primary {
+    width: 100%;
   }
 
   .summary-card strong {
