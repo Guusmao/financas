@@ -316,6 +316,19 @@ function fillSelect(select, options) {
   select.innerHTML = options.map((item) => `<option>${item}</option>`).join("");
 }
 
+function setupMoneyInputs() {
+  const moneyInputs = document.querySelectorAll(
+    'input[name="amount"], input[name="target"], input[name="saved"], #driverUber, #driver99, #driverGasolina'
+  );
+
+  moneyInputs.forEach((input) => {
+    input.type = "text";
+    input.setAttribute("inputmode", "decimal");
+    input.removeAttribute("step");
+    input.removeAttribute("min");
+  });
+}
+
 function syncInstallmentsVisibility(contaForm) {
   if (!contaForm) return;
   const recurrenceSelect = contaForm.querySelector('select[name="recurrence"]');
@@ -329,6 +342,7 @@ function syncInstallmentsVisibility(contaForm) {
 }
 
 function initForms() {
+  setupMoneyInputs();
   document.querySelectorAll('select[name="category"]').forEach((select) => fillSelect(select, config.categories));
   document.querySelectorAll('select[name="payment"]').forEach((select) => fillSelect(select, config.payments));
   document.querySelectorAll('input[type="date"]').forEach((input) => {
