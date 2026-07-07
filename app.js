@@ -329,6 +329,14 @@ function setupMoneyInputs() {
   });
 }
 
+function clearDriverForm() {
+  const fields = ["#driverData", "#driverUber", "#driver99", "#driverKm", "#driverGasolina", "#driverConsumo"];
+  fields.forEach((selector) => {
+    const input = document.querySelector(selector);
+    if (input) input.value = "";
+  });
+}
+
 function syncInstallmentsVisibility(contaForm) {
   if (!contaForm) return;
   const recurrenceSelect = contaForm.querySelector('select[name="recurrence"]');
@@ -379,7 +387,11 @@ function resetBillForm() {
 function totals() {
   // Filtra lançamentos do mês selecionado
   const monthlyEntries = state.entries.filter((entry) => entry.paid && entry.date.startsWith(selectedMonth));
-  const entradas = monthlyEntries.filter((entry) => entry.type === "Entrada").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const entradasLancamentos = monthlyEntries.filter((entry) => entry.type === "Entrada").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const entradasMotorista = state.motorista
+    .filter((registro) => registro.data.startsWith(selectedMonth))
+    .reduce((sum, registro) => sum + Number(registro.uber) + Number(registro.noventa_nove), 0);
+  const entradas = entradasLancamentos + entradasMotorista;
   const saidas = monthlyEntries.filter((entry) => entry.type === "Saída").reduce((sum, entry) => sum + Number(entry.amount), 0);
   
   // Reserva do mês: lançamentos de Reserva + movimentos de reserva do mês
@@ -871,7 +883,7 @@ document.querySelector("#metaForm").addEventListener("submit", async (event) => 
     return;
   }
 
-  event.currentTarget.reset();
+  clearDriverForm();
   await loadData();
 });
 
