@@ -939,8 +939,24 @@ document.querySelector("#driverForm").addEventListener("submit", async (event) =
     return;
   }
 
+  const registroMonth = String(registro.data || "").slice(0, 7);
+  if (/^\d{4}-\d{2}$/.test(registroMonth) && registroMonth !== selectedMonth) {
+    selectedMonth = registroMonth;
+    const monthSelector = document.querySelector("#monthSelector");
+    if (monthSelector) {
+      if (!monthSelector.querySelector(`option[value="${selectedMonth}"]`)) {
+        const [year, month] = selectedMonth.split("-").map(Number);
+        const optionDate = new Date(year, month - 1, 2);
+        const optionLabel = optionDate.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+        const capitalizedLabel = optionLabel.charAt(0).toUpperCase() + optionLabel.slice(1);
+        monthSelector.insertAdjacentHTML("beforeend", `<option value="${selectedMonth}">${capitalizedLabel}</option>`);
+      }
+      monthSelector.value = selectedMonth;
+    }
+    updateMonthLabels();
+  }
+
   event.currentTarget.reset();
-  document.querySelector("#driverData").value = getDefaultDateForInput();
   await loadData();
 });
 
