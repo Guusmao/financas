@@ -103,6 +103,11 @@ select {
   background: #ffffff;
 }
 
+#dynamicTabsNav {
+  display: grid;
+  gap: 8px;
+}
+
 .sidebar-footer {
   display: flex;
   gap: 8px;
@@ -279,6 +284,29 @@ select {
   font-size: 13px;
 }
 
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mini-action {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid #cfd7e3;
+  border-radius: 999px;
+  background: #f5f8fc;
+  color: #1e5d8f;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mini-action.active {
+  color: #fff;
+  border-color: #2f75a8;
+  background: #2f75a8;
+}
+
 .compact-list,
 .goal-list,
 .cards-list {
@@ -326,6 +354,19 @@ select {
 .status.warn {
   color: #8a520f;
   background: #fff0d2;
+}
+
+.status.unpaid {
+  color: #8f1f1f;
+  background: #ffe2e2;
+}
+
+.bill-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .reserve-total {
@@ -396,6 +437,10 @@ select {
   grid-template-columns: repeat(6, minmax(120px, 1fr)) 120px;
 }
 
+#customTabForm {
+  grid-template-columns: minmax(220px, 1fr) 140px;
+}
+
 .driver-form {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
@@ -453,6 +498,14 @@ select {
   min-height: 32px;
   padding: 0 10px;
   background: #9b3f3f;
+}
+
+.row-action.pay {
+  background: #2e8b57;
+}
+
+.row-action.neutral {
+  background: #5f6f85;
 }
 
 .table-wrap {
@@ -538,6 +591,10 @@ td {
   }
 
   .driver-form {
+    grid-template-columns: 1fr;
+  }
+
+  #customTabForm {
     grid-template-columns: 1fr;
   }
 

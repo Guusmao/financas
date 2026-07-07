@@ -26,9 +26,14 @@ const seed = {
   reserve: [],
 };
 
+const CUSTOM_TAB_PREFIX = "custom-tab-";
+
 // Supabase Client Setup
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const viteEnv = import.meta.env || {};
+const runtimeConfig = window.__APP_CONFIG__ || {};
+
+const supabaseUrl = viteEnv.VITE_SUPABASE_URL || runtimeConfig.SUPABASE_URL || "";
+const supabaseAnonKey = viteEnv.VITE_SUPABASE_ANON_KEY || runtimeConfig.SUPABASE_ANON_KEY || "";
 const isConfigured = supabaseUrl && supabaseAnonKey && supabaseUrl !== "your_supabase_project_url";
 
 let supabase = null;
@@ -43,10 +48,13 @@ let state = {
   goals: [],
   reserve: [],
   motorista: [],
+  customTabs: [],
+  customTabEntries: [],
 };
 
 let user = null;
 let selectedMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+let showOnlyUnpaidBills = false;
 
 function money(value) {
   return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -69,6 +77,277 @@ function getDefaultDateForInput() {
   return `${selectedMonth}-01`;
 }
 
+function normalizeTabName(name) {
+  return String(name || "")
+    .trim()
+    .slice(0, 40);
+}
+
+function slugifyTabName(name) {
+  return normalizeTabName(name)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function normalizeTextInput(value, maxLength = 120) {
+  return String(value || "")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function normalizeCustomTabId(rawId, fallbackBase = "aba") {
+  const safeCore = String(rawId || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "")
+    .slice(0, 80);
+
+  if (safeCore.startsWith(CUSTOM_TAB_PREFIX) && safeCore.length > CUSTOM_TAB_PREFIX.length) {
+    return safeCore;
+  }
+
+  const safeFallback = String(fallbackBase || "aba")
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "")
+    .slice(0, 40) || "aba";
+
+  return `${CUSTOM_TAB_PREFIX}${safeFallback}-${Date.now()}`;
+}
+
+function normalizeCustomEntryId(rawId) {
+  const safe = String(rawId || "")
+    .replace(/[^a-zA-Z0-9-_]/g, "")
+    .slice(0, 80);
+  return safe || crypto.randomUUID();
+}
+
+function normalizeAmount(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return parsed;
+}
+
+function encodeInstallmentRecurrence(totalInstallments, startMonth) {
+  const total = Math.max(2, Math.min(Number(totalInstallments) || 2, 120));
+  return `Parcelado|${total}|${startMonth}`;
+}
+
+function parseInstallmentRecurrence(recurrence) {
+  if (!String(recurrence || "").startsWith("Parcelado|")) return null;
+  const [, totalRaw, startMonthRaw] = String(recurrence).split("|");
+  const total = Number(totalRaw);
+  const startMonth = String(startMonthRaw || "").slice(0, 7);
+  if (!Number.isFinite(total) || total < 2 || !/^\d{4}-\d{2}$/.test(startMonth)) return null;
+  return { totalInstallments: Math.floor(total), startMonth };
+}
+
+function monthDiff(startMonth, targetMonth) {
+  const [sy, sm] = startMonth.split("-").map(Number);
+  const [ty, tm] = targetMonth.split("-").map(Number);
+  return (ty - sy) * 12 + (tm - sm);
+}
+
+function installmentProgressForMonth(recurrence, month) {
+  const installment = parseInstallmentRecurrence(recurrence);
+  if (!installment) return null;
+
+  const diff = monthDiff(installment.startMonth, month);
+  const currentInstallment = diff + 1;
+  if (currentInstallment < 1 || currentInstallment > installment.totalInstallments) {
+    return {
+      ...installment,
+      currentInstallment,
+      inRange: false,
+      finished: currentInstallment > installment.totalInstallments,
+    };
+  }
+
+  return {
+    ...installment,
+    currentInstallment,
+    inRange: true,
+    finished: false,
+  };
+}
+
+function recurrenceLabel(recurrence, month) {
+  const progress = installmentProgressForMonth(recurrence, month);
+  if (!progress) return recurrence;
+  if (progress.finished) return `Parcelado · concluída (${progress.totalInstallments}/${progress.totalInstallments})`;
+  if (!progress.inRange) return `Parcelado · fora do período`;
+  return `Parcelado · ${progress.currentInstallment}/${progress.totalInstallments}`;
+}
+
+function buildDueDateForMonth(month, dueDay) {
+  const [year, monthNumber] = month.split("-").map(Number);
+  const maxDay = new Date(year, monthNumber, 0).getDate();
+  const day = Math.min(Math.max(Number(dueDay) || 1, 1), maxDay);
+  return `${month}-${String(day).padStart(2, "0")}`;
+}
+
+function billDescriptionForMonth(bill, month) {
+  const progress = installmentProgressForMonth(bill.recurrence, month);
+  if (progress && progress.inRange) {
+    return `${bill.name} (${progress.currentInstallment}/${progress.totalInstallments})`;
+  }
+  return bill.name;
+}
+
+function billEntryForMonth(bill, month) {
+  const description = billDescriptionForMonth(bill, month);
+  return state.entries.find((entry) => (
+    entry.type === "Saída"
+    && entry.date.startsWith(month)
+    && entry.description === description
+  )) || null;
+}
+
+let isSyncingInstallments = false;
+
+async function ensureInstallmentsForMonth() {
+  if (!supabase || !user || isSyncingInstallments) return;
+
+  const pendingEntries = [];
+  for (const bill of state.bills) {
+    if (!bill.active) continue;
+    const progress = installmentProgressForMonth(bill.recurrence, selectedMonth);
+    if (!progress || !progress.inRange) continue;
+
+    const description = `${bill.name} (${progress.currentInstallment}/${progress.totalInstallments})`;
+    const exists = state.entries.some((entry) => (
+      entry.type === "Saída"
+      && entry.date.startsWith(selectedMonth)
+      && entry.description === description
+    ));
+    if (exists) continue;
+
+    pendingEntries.push({
+      user_id: user.id,
+      date: buildDueDateForMonth(selectedMonth, bill.dueDay),
+      type: "Saída",
+      category: bill.category,
+      description,
+      payment: "PIX",
+      amount: Number(bill.amount),
+      paid: false,
+      note: "Parcela automática de conta fixa",
+    });
+  }
+
+  if (!pendingEntries.length) return;
+
+  isSyncingInstallments = true;
+  const { data, error } = await supabase.from("entries").insert(pendingEntries).select();
+  isSyncingInstallments = false;
+  if (error) {
+    console.error("Erro ao gerar parcelas automáticas:", error);
+    return;
+  }
+
+  if (Array.isArray(data)) {
+    state.entries.push(...data.map((entry) => ({ ...entry, amount: Number(entry.amount) })));
+  }
+}
+
+function sanitizeCustomTabsState(tabsInput, entriesInput) {
+  const tabsRaw = Array.isArray(tabsInput) ? tabsInput : [];
+  const tabs = [];
+  const seenTabIds = new Set();
+
+  tabsRaw.forEach((tab) => {
+    const name = normalizeTabName(tab?.name) || "Nova aba";
+    let id = normalizeCustomTabId(tab?.id, slugifyTabName(name) || "aba");
+    if (seenTabIds.has(id)) {
+      id = `${id}-${Math.floor(Math.random() * 10000)}`;
+    }
+    seenTabIds.add(id);
+    tabs.push({ id, name });
+  });
+
+  const validTabIds = new Set(tabs.map((tab) => tab.id));
+  const entriesRaw = Array.isArray(entriesInput) ? entriesInput : [];
+  const entries = entriesRaw
+    .filter((entry) => validTabIds.has(entry?.tabId))
+    .map((entry) => ({
+      id: normalizeCustomEntryId(entry?.id),
+      tabId: entry.tabId,
+      date: String(entry?.date || getDefaultDateForInput()).slice(0, 10),
+      type: entry?.type === "Saída" ? "Saída" : "Entrada",
+      description: normalizeTextInput(entry?.description, 120),
+      amount: normalizeAmount(entry?.amount),
+      note: normalizeTextInput(entry?.note, 240),
+    }));
+
+  return { tabs, entries };
+}
+
+function customTabsStorageKey() {
+  return user ? `financas-custom-tabs-${user.id}` : null;
+}
+
+function customTabEntriesStorageKey() {
+  return user ? `financas-custom-tab-entries-${user.id}` : null;
+}
+
+function saveCustomTabsState() {
+  const tabsKey = customTabsStorageKey();
+  const entriesKey = customTabEntriesStorageKey();
+  if (!tabsKey || !entriesKey) return;
+
+  localStorage.setItem(tabsKey, JSON.stringify(state.customTabs));
+  localStorage.setItem(entriesKey, JSON.stringify(state.customTabEntries));
+}
+
+function loadCustomTabsState() {
+  const tabsKey = customTabsStorageKey();
+  const entriesKey = customTabEntriesStorageKey();
+  if (!tabsKey || !entriesKey) {
+    state.customTabs = [];
+    state.customTabEntries = [];
+    return;
+  }
+
+  try {
+    const tabs = JSON.parse(localStorage.getItem(tabsKey) || "[]");
+    const entries = JSON.parse(localStorage.getItem(entriesKey) || "[]");
+    const sanitized = sanitizeCustomTabsState(tabs, entries);
+
+    state.customTabs = sanitized.tabs;
+    state.customTabEntries = sanitized.entries;
+  } catch {
+    state.customTabs = [];
+    state.customTabEntries = [];
+  }
+}
+
+function customTabMonthTotals(tabId) {
+  const rows = state.customTabEntries.filter((entry) => entry.tabId === tabId && entry.date.startsWith(selectedMonth));
+  const entradas = rows
+    .filter((entry) => entry.type === "Entrada")
+    .reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const saidas = rows
+    .filter((entry) => entry.type === "Saída")
+    .reduce((sum, entry) => sum + Number(entry.amount), 0);
+
+  return {
+    total: rows.length,
+    entradas,
+    saidas,
+    saldo: entradas - saidas,
+  };
+}
+
 function fillSelect(select, options) {
   select.innerHTML = options.map((item) => `<option>${item}</option>`).join("");
 }
@@ -79,6 +358,22 @@ function initForms() {
   document.querySelectorAll('input[type="date"]').forEach((input) => {
     input.value = getDefaultDateForInput();
   });
+
+  const contaForm = document.querySelector("#contaForm");
+  if (contaForm && !contaForm.dataset.installmentsBound) {
+    const recurrenceSelect = contaForm.querySelector('select[name="recurrence"]');
+    const installmentsInput = contaForm.querySelector('input[name="installments"]');
+
+    const toggleInstallments = () => {
+      const isInstallment = recurrenceSelect.value === "Parcelado";
+      installmentsInput.hidden = !isInstallment;
+      installmentsInput.required = isInstallment;
+    };
+
+    recurrenceSelect.addEventListener("change", toggleInstallments);
+    toggleInstallments();
+    contaForm.dataset.installmentsBound = "1";
+  }
 }
 
 function totals() {
@@ -121,20 +416,33 @@ function renderDashboard() {
   const paidDescriptions = new Set(monthlyPaidEntries.map((entry) => entry.description));
   
   const bills = state.bills.filter((bill) => bill.active);
-  document.querySelector("#contasStatus").textContent = `${bills.length} ativas`;
-  document.querySelector("#dashboardContas").innerHTML = bills.map((bill) => {
-    const paid = paidCategories.has(bill.name) || paidCategories.has(bill.category) || paidDescriptions.has(bill.name);
+  const toggleBtn = document.querySelector("#toggleUnpaidBills");
+  if (toggleBtn) {
+    toggleBtn.textContent = `Somente não pagas: ${showOnlyUnpaidBills ? "On" : "Off"}`;
+    toggleBtn.classList.toggle("active", showOnlyUnpaidBills);
+  }
+
+  const billsWithStatus = bills.map((bill) => {
+    const monthEntry = billEntryForMonth(bill, selectedMonth);
+    const paid = monthEntry ? !!monthEntry.paid : (paidCategories.has(bill.name) || paidCategories.has(bill.category) || paidDescriptions.has(bill.name));
+    return { bill, paid };
+  });
+
+  const visibleBills = showOnlyUnpaidBills ? billsWithStatus.filter((item) => !item.paid) : billsWithStatus;
+  document.querySelector("#contasStatus").textContent = `${visibleBills.length}/${bills.length}`;
+  document.querySelector("#dashboardContas").innerHTML = visibleBills.map(({ bill, paid }) => {
+    const recurrenceText = recurrenceLabel(bill.recurrence, selectedMonth);
     return `<div class="list-row">
-      <div><strong>${bill.name}</strong><small>${bill.category} · vence dia ${bill.dueDay}</small></div>
-      <div><span class="amount">${money(bill.amount)}</span><span class="status ${paid ? "ok" : "warn"}">${paid ? "Pago" : "Pendente"}</span></div>
+      <div><strong>${escapeHtml(bill.name)}</strong><small>${escapeHtml(bill.category)} · vence dia ${bill.dueDay} · ${escapeHtml(recurrenceText)}</small></div>
+      <div><span class="amount">${money(bill.amount)}</span><span class="status ${paid ? "ok" : "unpaid"}">${paid ? "Pago" : "Não pago"}</span></div>
     </div>`;
-  }).join("") || emptyRow("Nenhuma conta fixa");
+  }).join("") || emptyRow(showOnlyUnpaidBills ? "Nenhuma conta não paga" : "Nenhuma conta fixa");
 
   // Gastos do mês selecionado
   const gastos = state.entries.filter((entry) => entry.type === "Saída" && entry.date.startsWith(selectedMonth)).slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
   document.querySelector("#gastosStatus").textContent = `${gastos.length} recentes`;
   document.querySelector("#dashboardGastos").innerHTML = gastos.map((entry) => `<div class="list-row">
-    <div><strong>${entry.description}</strong><small>${dateLabel(entry.date)} · ${entry.category} · ${entry.payment}</small></div>
+    <div><strong>${escapeHtml(entry.description)}</strong><small>${dateLabel(entry.date)} · ${escapeHtml(entry.category)} · ${escapeHtml(entry.payment)}</small></div>
     <span class="amount">${money(entry.amount)}</span>
   </div>`).join("") || emptyRow("Nenhum gasto lançado");
 
@@ -145,7 +453,7 @@ function renderDashboard() {
   const reserveMonth = state.reserve.filter((item) => item.date.startsWith(selectedMonth));
   document.querySelector("#reservaStatus").textContent = `${reserveMonth.length} movimentos`;
   document.querySelector("#dashboardReservaMovimentos").innerHTML = reserveMonth.slice(-4).reverse().map((item) => `<div class="list-row">
-    <div><strong>${dateLabel(item.date)}</strong><small>${item.note || item.type}</small></div>
+    <div><strong>${dateLabel(item.date)}</strong><small>${escapeHtml(item.note || item.type)}</small></div>
     <span class="amount">${item.type === "Saída" ? "-" : ""}${money(item.amount)}</span>
   </div>`).join("") || emptyRow("Sem movimentos");
 
@@ -153,6 +461,23 @@ function renderDashboard() {
   document.querySelector("#barEntradas").style.width = `${(total.entradas / max) * 100}%`;
   document.querySelector("#barSaidas").style.width = `${(total.saidas / max) * 100}%`;
   document.querySelector("#barReserva").style.width = `${(total.reservaMes / max) * 100}%`;
+
+  renderCustomTabsDashboard();
+}
+
+function renderCustomTabsDashboard() {
+  const statusEl = document.querySelector("#customTabsStatus");
+  const listEl = document.querySelector("#dashboardCustomTabs");
+  if (!statusEl || !listEl) return;
+
+  statusEl.textContent = `${state.customTabs.length} abas`;
+  listEl.innerHTML = state.customTabs.map((tab) => {
+    const totals = customTabMonthTotals(tab.id);
+    return `<div class="list-row">
+      <div><strong>${escapeHtml(tab.name)}</strong><small>${totals.total} registros no mês</small></div>
+      <span class="amount">${money(totals.saldo)}</span>
+    </div>`;
+  }).join("") || emptyRow("Nenhuma aba personalizada");
 }
 
 function emptyRow(text) {
@@ -165,7 +490,7 @@ function goalCard(goal) {
   const percent = target ? Math.min((saved / target) * 100, 100) : 0;
   return `<div class="data-card">
     <div>
-      <strong>${goal.name}</strong>
+      <strong>${escapeHtml(goal.name)}</strong>
       <small>${money(saved)} de ${money(target)} · falta ${money(Math.max(target - saved, 0))}</small>
       <div class="progress"><i style="width:${percent}%"></i></div>
     </div>
@@ -177,10 +502,10 @@ function renderEntries() {
   // Filtra lançamentos exibidos na tabela de lançamentos por mês ativo
   const rows = state.entries.filter((entry) => entry.date.startsWith(selectedMonth)).slice().sort((a, b) => b.date.localeCompare(a.date)).map((entry) => `<tr>
     <td>${dateLabel(entry.date)}</td>
-    <td>${entry.type}</td>
-    <td>${entry.category}</td>
-    <td>${entry.description}</td>
-    <td>${entry.payment}</td>
+    <td>${escapeHtml(entry.type)}</td>
+    <td>${escapeHtml(entry.category)}</td>
+    <td>${escapeHtml(entry.description)}</td>
+    <td>${escapeHtml(entry.payment)}</td>
     <td>${money(entry.amount)}</td>
     <td>${entry.paid ? "☑" : "☐"}</td>
     <td><button class="row-action" data-delete-entry="${entry.id}" type="button">Excluir</button></td>
@@ -189,10 +514,22 @@ function renderEntries() {
 }
 
 function renderBills() {
-  document.querySelector("#contasList").innerHTML = state.bills.map((bill) => `<div class="data-card">
-    <div><strong>${bill.name}</strong><small>${bill.category} · ${money(bill.amount)} · dia ${bill.dueDay} · ${bill.recurrence} · ${bill.active ? "Ativa" : "Inativa"}</small></div>
-    <button class="row-action" data-delete-bill="${bill.id}" type="button">Excluir</button>
-  </div>`).join("");
+  const orderedBills = [...state.bills].reverse();
+  document.querySelector("#contasList").innerHTML = orderedBills.map((bill) => {
+    const monthEntry = billEntryForMonth(bill, selectedMonth);
+    const paid = monthEntry ? !!monthEntry.paid : false;
+    return `<div class="data-card">
+      <div>
+        <strong>${escapeHtml(bill.name)}</strong>
+        <small>${escapeHtml(bill.category)} · ${money(bill.amount)} · dia ${bill.dueDay} · ${escapeHtml(recurrenceLabel(bill.recurrence, selectedMonth))} · ${bill.active ? "Ativa" : "Inativa"}</small>
+      </div>
+      <div class="bill-actions">
+        <span class="status ${paid ? "ok" : "unpaid"}">${paid ? "Pago" : "Não pago"}</span>
+        <button class="row-action ${paid ? "neutral" : "pay"}" data-toggle-bill-paid="${bill.id}" type="button">${paid ? "Desmarcar" : "Marcar pago"}</button>
+        <button class="row-action" data-delete-bill="${bill.id}" type="button">Excluir</button>
+      </div>
+    </div>`;
+  }).join("");
 }
 
 // Goals and Reserve logic
@@ -205,13 +542,109 @@ function renderReserve() {
   document.querySelector("#reservaTable").innerHTML = state.reserve.filter((item) => item.date.startsWith(selectedMonth)).slice().sort((a, b) => b.date.localeCompare(a.date)).map((item) => `<tr>
     <td>${dateLabel(item.date)}</td>
     <td>${money(item.amount)}</td>
-    <td>${item.type}</td>
-    <td>${item.note || ""}</td>
+    <td>${escapeHtml(item.type)}</td>
+    <td>${escapeHtml(item.note || "")}</td>
     <td><button class="row-action" data-delete-reserve="${item.id}" type="button">Excluir</button></td>
   </tr>`).join("");
 }
 
+function renderCustomTabsNav() {
+  const navHost = document.querySelector("#dynamicTabsNav");
+  if (!navHost) return;
+
+  navHost.innerHTML = state.customTabs
+    .map((tab) => `<button class="nav-tab dynamic-tab" data-tab="${tab.id}" type="button">${escapeHtml(tab.name)}</button>`)
+    .join("");
+}
+
+function renderCustomTabsManagerList() {
+  const listEl = document.querySelector("#customTabsList");
+  if (!listEl) return;
+
+  listEl.innerHTML = state.customTabs.map((tab) => {
+    const totals = customTabMonthTotals(tab.id);
+    return `<div class="data-card">
+      <div>
+        <strong>${escapeHtml(tab.name)}</strong>
+        <small>${totals.total} registros neste mês · saldo ${money(totals.saldo)}</small>
+      </div>
+      <button class="row-action" data-delete-custom-tab="${tab.id}" type="button">Excluir</button>
+    </div>`;
+  }).join("") || emptyRow("Nenhuma aba criada ainda");
+}
+
+function renderCustomTabViews() {
+  const viewsHost = document.querySelector("#dynamicViewsContainer");
+  if (!viewsHost) return;
+
+  viewsHost.innerHTML = state.customTabs.map((tab) => {
+    const rows = state.customTabEntries
+      .filter((entry) => entry.tabId === tab.id && entry.date.startsWith(selectedMonth))
+      .slice()
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    return `<section id="${tab.id}" class="view">
+      <header class="page-header">
+        <div>
+          <h2>${escapeHtml(tab.name)}</h2>
+          <p>Lançamentos personalizados</p>
+        </div>
+      </header>
+
+      <form class="entry-form compact custom-tab-entry-form" data-custom-tab-id="${tab.id}">
+        <input type="date" name="date" value="${getDefaultDateForInput()}" required />
+        <select name="type" required>
+          <option>Entrada</option>
+          <option>Saída</option>
+        </select>
+        <input name="description" placeholder="Descrição" required />
+        <input name="amount" type="number" step="0.01" min="0" placeholder="Valor" required />
+        <input name="note" placeholder="Observação" />
+        <button type="submit">Adicionar</button>
+      </form>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Data</th>
+              <th>Tipo</th>
+              <th>Descrição</th>
+              <th>Valor</th>
+              <th>Observação</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((entry) => `<tr>
+              <td>${dateLabel(entry.date)}</td>
+              <td>${escapeHtml(entry.type)}</td>
+              <td>${escapeHtml(entry.description)}</td>
+              <td>${money(entry.amount)}</td>
+              <td>${escapeHtml(entry.note || "")}</td>
+              <td><button class="row-action" data-delete-custom-entry="${entry.id}" type="button">Excluir</button></td>
+            </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+    </section>`;
+  }).join("");
+}
+
+function switchTab(tabId) {
+  const targetView = document.getElementById(tabId);
+  if (!targetView) return;
+
+  document.querySelectorAll(".nav-tab, .view").forEach((item) => item.classList.remove("active"));
+  targetView.classList.add("active");
+  const targetButton = document.querySelector(`.nav-tab[data-tab="${tabId}"]`);
+  if (targetButton) targetButton.classList.add("active");
+}
+
 function render() {
+  renderCustomTabsNav();
+  renderCustomTabViews();
+  renderCustomTabsManagerList();
   renderDashboard();
   renderEntries();
   renderBills();
@@ -269,6 +702,10 @@ async function loadData() {
       consumo_veiculo: Number(item.consumo_veiculo)
     }));
 
+    loadCustomTabsState();
+
+    await ensureInstallmentsForMonth();
+
     render();
   } catch (err) {
     console.error("Erro ao carregar dados:", err);
@@ -302,10 +739,11 @@ function initMonthSelector() {
   selector.innerHTML = options.map(opt => `<option value="${opt.value}">${opt.label}</option>`).join("");
   selector.value = selectedMonth;
 
-  selector.addEventListener("change", (e) => {
+  selector.addEventListener("change", async (e) => {
     selectedMonth = e.target.value;
     updateMonthLabels();
     initForms(); // Atualiza data padrão dos formulários
+    await ensureInstallmentsForMonth();
     render();
   });
 }
@@ -348,18 +786,23 @@ async function checkAuth() {
     await loadData();
   } else {
     user = null;
+    state.customTabs = [];
+    state.customTabEntries = [];
     authScreen.classList.remove("hidden");
     appShell.classList.add("hidden");
   }
 }
 
-// Navigation Tabs
-document.querySelectorAll(".nav-tab").forEach((button) => {
-  button.addEventListener("click", () => {
-    document.querySelectorAll(".nav-tab, .view").forEach((item) => item.classList.remove("active"));
-    button.classList.add("active");
-    document.querySelector(`#${button.dataset.tab}`).classList.add("active");
-  });
+// Navigation Tabs (inclui abas dinâmicas)
+document.querySelector(".nav-tabs").addEventListener("click", (event) => {
+  const button = event.target.closest(".nav-tab");
+  if (!button) return;
+  switchTab(button.dataset.tab);
+});
+
+document.querySelector("#toggleUnpaidBills")?.addEventListener("click", () => {
+  showOnlyUnpaidBills = !showOnlyUnpaidBills;
+  renderDashboard();
 });
 
 // Authentication Setup
@@ -375,7 +818,7 @@ const authError = document.querySelector("#auth-error");
 const logoutBtn = document.querySelector("#logoutBtn");
 
 if (!isConfigured) {
-  authError.innerHTML = `<strong>Configuração necessária!</strong><br>Por favor, crie o arquivo <code>.env</code> com as chaves <code>VITE_SUPABASE_URL</code> e <code>VITE_SUPABASE_ANON_KEY</code>. Veja <code>.env.example</code>.`;
+  authError.innerHTML = `<strong>Configuração necessária!</strong><br>Use <code>.env</code> (Vite) ou <code>config.js</code> (Go Live) com URL e chave anon do Supabase. Veja <code>.env.example</code> e <code>config.example.js</code>.`;
   authError.classList.remove("hidden");
   authSubmitBtn.disabled = true;
 }
@@ -446,16 +889,20 @@ document.querySelector("#lancamentoForm").addEventListener("submit", async (even
   if (!supabase || !user) return;
   
   const data = formData(event.currentTarget);
+  const allowedTypes = ["Entrada", "Saída", "Reserva"];
+  const type = allowedTypes.includes(data.type) ? data.type : "Saída";
+  const category = config.categories.includes(data.category) ? data.category : "Outros";
+  const payment = config.payments.includes(data.payment) ? data.payment : "PIX";
   const entry = {
     user_id: user.id,
     date: data.date,
-    type: data.type,
-    category: data.category,
-    description: data.description,
-    payment: data.payment,
+    type,
+    category,
+    description: normalizeTextInput(data.description, 120),
+    payment,
     amount: Number(data.amount),
     paid: event.currentTarget.paid.checked,
-    note: data.note,
+    note: normalizeTextInput(data.note, 240),
   };
   
   const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
@@ -482,13 +929,17 @@ document.querySelector("#contaForm").addEventListener("submit", async (event) =>
   if (!supabase || !user) return;
 
   const data = formData(event.currentTarget);
+  const recurrenceOptions = ["Mensal", "Anual", "Única"];
+  const recurrence = data.recurrence === "Parcelado"
+    ? encodeInstallmentRecurrence(Number(data.installments), selectedMonth)
+    : (recurrenceOptions.includes(data.recurrence) ? data.recurrence : "Mensal");
   const bill = {
     user_id: user.id,
-    name: data.name,
-    category: data.category,
+    name: normalizeTextInput(data.name, 80),
+    category: config.categories.includes(data.category) ? data.category : "Outros",
     amount: Number(data.amount),
     due_day: Number(data.dueDay),
-    recurrence: data.recurrence,
+    recurrence,
     active: event.currentTarget.active.checked,
   };
   
@@ -516,6 +967,7 @@ document.querySelector("#contaForm").addEventListener("submit", async (event) =>
     });
     event.currentTarget.reset();
     initForms();
+    await ensureInstallmentsForMonth();
     render();
   }
 });
@@ -527,7 +979,7 @@ document.querySelector("#metaForm").addEventListener("submit", async (event) => 
   const data = formData(event.currentTarget);
   const goal = {
     user_id: user.id,
-    name: data.name,
+    name: normalizeTextInput(data.name, 80),
     target: Number(data.target),
     saved: Number(data.saved)
   };
@@ -555,12 +1007,13 @@ document.querySelector("#reservaForm").addEventListener("submit", async (event) 
   if (!supabase || !user) return;
 
   const data = formData(event.currentTarget);
+  const reserveType = data.type === "Saída" ? "Saída" : "Entrada";
   const reserve = {
     user_id: user.id,
     date: data.date,
     amount: Number(data.amount),
-    type: data.type,
-    note: data.note
+    type: reserveType,
+    note: normalizeTextInput(data.note, 240)
   };
 
   const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
@@ -580,6 +1033,57 @@ document.querySelector("#reservaForm").addEventListener("submit", async (event) 
     initForms();
     render();
   }
+});
+
+document.querySelector("#customTabForm").addEventListener("submit", (event) => {
+  event.preventDefault();
+  if (!user) return;
+
+  const data = formData(event.currentTarget);
+  const name = normalizeTabName(data.name);
+  if (!name) {
+    alert("Informe um nome válido para a aba.");
+    return;
+  }
+
+  const slug = slugifyTabName(name);
+  const idBase = slug || `aba-${Date.now()}`;
+  const existing = new Set(state.customTabs.map((tab) => tab.id));
+  let id = normalizeCustomTabId(`${CUSTOM_TAB_PREFIX}${idBase}`, idBase);
+  let attempt = 1;
+  while (existing.has(id)) {
+    attempt += 1;
+    id = normalizeCustomTabId(`${CUSTOM_TAB_PREFIX}${idBase}-${attempt}`, `${idBase}-${attempt}`);
+  }
+
+  state.customTabs.push({ id, name });
+  saveCustomTabsState();
+  event.currentTarget.reset();
+  render();
+  switchTab(id);
+});
+
+document.body.addEventListener("submit", (event) => {
+  const form = event.target.closest(".custom-tab-entry-form");
+  if (!form || !user) return;
+
+  event.preventDefault();
+  const tabId = form.dataset.customTabId;
+  const data = formData(form);
+
+  state.customTabEntries.push({
+    id: normalizeCustomEntryId(crypto.randomUUID()),
+    tabId,
+    date: data.date,
+    type: data.type === "Saída" ? "Saída" : "Entrada",
+    description: normalizeTextInput(data.description, 120),
+    amount: normalizeAmount(data.amount),
+    note: normalizeTextInput(data.note, 240),
+  });
+
+  saveCustomTabsState();
+  render();
+  switchTab(tabId);
 });
 
 // ======================================================
@@ -624,7 +1128,90 @@ document.querySelector("#driverForm").addEventListener("submit", async (event) =
 // Delete Actions
 document.body.addEventListener("click", async (event) => {
   const button = event.target.closest("button");
-  if (!button || !supabase || !user) return;
+  if (!button || !user) return;
+
+  const toggleBillPaidId = button.dataset.toggleBillPaid;
+  if (toggleBillPaidId) {
+    if (!supabase) {
+      alert("Configuração do Supabase necessária para marcar pagamento.");
+      return;
+    }
+
+    const bill = state.bills.find((item) => item.id === toggleBillPaidId);
+    if (!bill) return;
+
+    const existingEntry = billEntryForMonth(bill, selectedMonth);
+    button.disabled = true;
+
+    if (existingEntry) {
+      const { data, error } = await supabase
+        .from("entries")
+        .update({ paid: !existingEntry.paid })
+        .eq("id", existingEntry.id)
+        .select()
+        .single();
+
+      if (error) {
+        alert("Erro ao atualizar pagamento: " + error.message);
+        button.disabled = false;
+        return;
+      }
+
+      state.entries = state.entries.map((entry) => entry.id === existingEntry.id ? { ...entry, ...data, amount: Number(data.amount) } : entry);
+    } else {
+      const newEntry = {
+        user_id: user.id,
+        date: buildDueDateForMonth(selectedMonth, bill.dueDay),
+        type: "Saída",
+        category: bill.category,
+        description: billDescriptionForMonth(bill, selectedMonth),
+        payment: "PIX",
+        amount: Number(bill.amount),
+        paid: true,
+        note: "Pagamento manual de conta fixa",
+      };
+
+      const { data, error } = await supabase
+        .from("entries")
+        .insert(newEntry)
+        .select()
+        .single();
+
+      if (error) {
+        alert("Erro ao registrar pagamento: " + error.message);
+        button.disabled = false;
+        return;
+      }
+
+      state.entries.push({ ...data, amount: Number(data.amount) });
+    }
+
+    button.disabled = false;
+    render();
+    return;
+  }
+
+  const customEntryId = button.dataset.deleteCustomEntry;
+  if (customEntryId) {
+    if (!confirm("Tem certeza que deseja excluir este registro?")) return;
+    state.customTabEntries = state.customTabEntries.filter((item) => item.id !== customEntryId);
+    saveCustomTabsState();
+    render();
+    return;
+  }
+
+  const customTabId = button.dataset.deleteCustomTab;
+  if (customTabId) {
+    if (!confirm("Tem certeza que deseja excluir esta aba e seus registros?")) return;
+    state.customTabs = state.customTabs.filter((item) => item.id !== customTabId);
+    state.customTabEntries = state.customTabEntries.filter((item) => item.tabId !== customTabId);
+    saveCustomTabsState();
+    render();
+    switchTab("abas");
+    return;
+  }
+
+  if (!supabase) return;
   
   const maps = [
     { key: "deleteEntry", table: "entries", stateKey: "entries" },
@@ -653,7 +1240,12 @@ document.body.addEventListener("click", async (event) => {
 
 // Data Export / Import / Reset
 document.querySelector("#exportData").addEventListener("click", () => {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const exportState = {
+    ...state,
+    customTabs: state.customTabs,
+    customTabEntries: state.customTabEntries,
+  };
+  const blob = new Blob([JSON.stringify(exportState, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -726,6 +1318,12 @@ document.querySelector("#importData").addEventListener("change", async (event) =
       consumo_veiculo: Number(m.consumo_veiculo)
     }));
 
+    const sanitizedCustomState = sanitizeCustomTabsState(imported.customTabs, imported.customTabEntries);
+    state.customTabs = sanitizedCustomState.tabs;
+    state.customTabEntries = sanitizedCustomState.entries;
+
+    saveCustomTabsState();
+
     await Promise.all([
       entries.length > 0 ? supabase.from('entries').insert(entries) : Promise.resolve(),
       bills.length > 0 ? supabase.from('bills').insert(bills) : Promise.resolve(),
@@ -790,6 +1388,10 @@ document.querySelector("#resetData").addEventListener("click", async () => {
       bills.length > 0 ? supabase.from('bills').insert(bills) : Promise.resolve(),
       goals.length > 0 ? supabase.from('goals').insert(goals) : Promise.resolve()
     ]);
+
+    state.customTabs = [];
+    state.customTabEntries = [];
+    saveCustomTabsState();
 
     await loadData();
   } catch (err) {

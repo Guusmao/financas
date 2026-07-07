@@ -118,6 +118,20 @@ create policy "Usuários podem ver seus próprios registros de motorista" on mot
    VITE_SUPABASE_ANON_KEY=seu-token-anon-do-supabase
    ```
 
+### 3.1 Usar com Go Live (servidor estático)
+Se você for abrir o projeto com **Go Live**, o `.env` não é processado. Nesse caso:
+1. Copie `config.example.js` para `config.js`.
+2. Preencha o arquivo `config.js` com seus dados do Supabase:
+   ```js
+   window.__APP_CONFIG__ = {
+     SUPABASE_URL: "https://sua-url-do-supabase.supabase.co",
+     SUPABASE_ANON_KEY: "seu-token-anon-do-supabase"
+   };
+   ```
+3. Abra com Go Live normalmente.
+
+> `config.js` está no `.gitignore` para evitar envio de credenciais.
+
 ### 4. Instalar e Executar
 1. Instale as dependências do projeto:
    ```bash
