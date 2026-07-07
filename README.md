@@ -76,17 +76,32 @@ create table reserve (
   created_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
+-- Tabela Motorista de Aplicativo
+create table motorista_registros (
+   id uuid primary key default gen_random_uuid(),
+   user_id uuid references auth.users not null,
+   data date not null,
+   uber numeric(12, 2) not null default 0,
+   noventa_nove numeric(12, 2) not null default 0,
+   quilometragem numeric(12, 2) not null default 0,
+   preco_gasolina numeric(12, 2) not null default 0,
+   consumo_veiculo numeric(12, 2) not null default 0,
+   created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
 -- Configurar Row Level Security (RLS) para isolar dados de cada usuário
 alter table entries enable row level security;
 alter table bills enable row level security;
 alter table goals enable row level security;
 alter table reserve enable row level security;
+alter table motorista_registros enable row level security;
 
 -- Políticas de RLS
 create policy "Usuários podem ver seus próprios lançamentos" on entries for all using (auth.uid() = user_id);
 create policy "Usuários podem ver suas próprias contas" on bills for all using (auth.uid() = user_id);
 create policy "Usuários podem ver suas próprias metas" on goals for all using (auth.uid() = user_id);
 create policy "Usuários podem ver suas próprias reservas" on reserve for all using (auth.uid() = user_id);
+create policy "Usuários podem ver seus próprios registros de motorista" on motorista_registros for all using (auth.uid() = user_id);
 ```
 
 4. Clique em **Run** no Supabase para criar as tabelas.

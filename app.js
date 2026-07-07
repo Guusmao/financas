@@ -1,6 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import {
+  renderMotorista
+} from "./motorista.js";
 
-const storageKey = "felip-financas-web-v1";
+import { createClient } from '@supabase/supabase-js';
 
 const config = {
   categories: ["Salário", "Mercado", "Internet", "Moradia", "Educação", "Transporte", "Faculdade", "Seguro", "TIM", "Lazer", "Saúde", "Reserva", "Outros"],
@@ -40,7 +42,9 @@ let state = {
   bills: [],
   goals: [],
   reserve: [],
+  motorista: [],
 };
+
 let user = null;
 let selectedMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
 
@@ -213,6 +217,7 @@ function render() {
   renderBills();
   renderGoals();
   renderReserve();
+  renderMotorista(state.motorista, selectedMonth, money, dateLabel);
 }
 
 function formData(form) {
@@ -223,17 +228,25 @@ function formData(form) {
 async function loadData() {
   if (!user || !supabase) return;
   try {
-    const [entriesRes, billsRes, goalsRes, reserveRes] = await Promise.all([
-      supabase.from('entries').select('*').order('date', { ascending: false }),
-      supabase.from('bills').select('*').order('due_day', { ascending: true }),
-      supabase.from('goals').select('*').order('name', { ascending: true }),
-      supabase.from('reserve').select('*').order('date', { ascending: false })
+    const [
+      entriesRes,
+      billsRes,
+      goalsRes,
+      reserveRes,
+      motoristaRes
+    ] = await Promise.all([
+      supabase.from("entries").select("*").order("date", { ascending: false }),
+      supabase.from("bills").select("*").order("due_day", { ascending: true }),
+      supabase.from("goals").select("*").order("name", { ascending: true }),
+      supabase.from("reserve").select("*").order("date", { ascending: false }),
+      supabase.from("motorista_registros").select("*").order("data", { ascending: false })
     ]);
 
     if (entriesRes.error) throw entriesRes.error;
     if (billsRes.error) throw billsRes.error;
     if (goalsRes.error) throw goalsRes.error;
     if (reserveRes.error) throw reserveRes.error;
+    if (motoristaRes.error) throw motoristaRes.error;
 
     state.entries = (entriesRes.data || []).map(e => ({ ...e, amount: Number(e.amount) }));
     state.bills = (billsRes.data || []).map(b => ({
@@ -247,6 +260,14 @@ async function loadData() {
     }));
     state.goals = (goalsRes.data || []).map(g => ({ ...g, target: Number(g.target), saved: Number(g.saved) }));
     state.reserve = (reserveRes.data || []).map(r => ({ ...r, amount: Number(r.amount) }));
+    state.motorista = (motoristaRes.data || []).map((item) => ({
+      ...item,
+      uber: Number(item.uber),
+      noventa_nove: Number(item.noventa_nove),
+      quilometragem: Number(item.quilometragem),
+      preco_gasolina: Number(item.preco_gasolina),
+      consumo_veiculo: Number(item.consumo_veiculo)
+    }));
 
     render();
   } catch (err) {
@@ -561,6 +582,45 @@ document.querySelector("#reservaForm").addEventListener("submit", async (event) 
   }
 });
 
+// ======================================================
+// MOTORISTA DE APLICATIVO
+// SALVAR REGISTRO
+// ======================================================
+
+document.querySelector("#driverForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!supabase || !user) return;
+
+  const submitButton = event.currentTarget.querySelector('button[type="submit"]');
+  submitButton.disabled = true;
+
+  const registro = {
+    user_id: user.id,
+    data: document.querySelector("#driverData").value,
+    uber: Number(document.querySelector("#driverUber").value || 0),
+    noventa_nove: Number(document.querySelector("#driver99").value || 0),
+    quilometragem: Number(document.querySelector("#driverKm").value || 0),
+    preco_gasolina: Number(document.querySelector("#driverGasolina").value || 0),
+    consumo_veiculo: Number(document.querySelector("#driverConsumo").value || 0)
+  };
+
+  const { error } = await supabase
+    .from("motorista_registros")
+    .insert(registro);
+
+  submitButton.disabled = false;
+
+  if (error) {
+    console.error(error);
+    alert(error.message);
+    return;
+  }
+
+  event.currentTarget.reset();
+  document.querySelector("#driverData").value = getDefaultDateForInput();
+  await loadData();
+});
+
 // Delete Actions
 document.body.addEventListener("click", async (event) => {
   const button = event.target.closest("button");
@@ -571,6 +631,7 @@ document.body.addEventListener("click", async (event) => {
     { key: "deleteBill", table: "bills", stateKey: "bills" },
     { key: "deleteGoal", table: "goals", stateKey: "goals" },
     { key: "deleteReserve", table: "reserve", stateKey: "reserve" },
+    { key: "deleteDriver", table: "motorista_registros", stateKey: "motorista" },
   ];
   
   for (const map of maps) {
@@ -613,7 +674,8 @@ document.querySelector("#importData").addEventListener("change", async (event) =
       supabase.from('entries').delete().eq('user_id', user.id),
       supabase.from('bills').delete().eq('user_id', user.id),
       supabase.from('goals').delete().eq('user_id', user.id),
-      supabase.from('reserve').delete().eq('user_id', user.id)
+      supabase.from('reserve').delete().eq('user_id', user.id),
+      supabase.from('motorista_registros').delete().eq('user_id', user.id)
     ]);
 
     // Map and insert
@@ -654,11 +716,22 @@ document.querySelector("#importData").addEventListener("change", async (event) =
       note: r.note
     }));
 
+    const motorista = (imported.motorista || []).map(m => ({
+      user_id: user.id,
+      data: m.data,
+      uber: Number(m.uber),
+      noventa_nove: Number(m.noventa_nove),
+      quilometragem: Number(m.quilometragem),
+      preco_gasolina: Number(m.preco_gasolina),
+      consumo_veiculo: Number(m.consumo_veiculo)
+    }));
+
     await Promise.all([
       entries.length > 0 ? supabase.from('entries').insert(entries) : Promise.resolve(),
       bills.length > 0 ? supabase.from('bills').insert(bills) : Promise.resolve(),
       goals.length > 0 ? supabase.from('goals').insert(goals) : Promise.resolve(),
-      reserve.length > 0 ? supabase.from('reserve').insert(reserve) : Promise.resolve()
+      reserve.length > 0 ? supabase.from('reserve').insert(reserve) : Promise.resolve(),
+      motorista.length > 0 ? supabase.from('motorista_registros').insert(motorista) : Promise.resolve()
     ]);
 
     await loadData();
@@ -678,7 +751,8 @@ document.querySelector("#resetData").addEventListener("click", async () => {
       supabase.from('entries').delete().eq('user_id', user.id),
       supabase.from('bills').delete().eq('user_id', user.id),
       supabase.from('goals').delete().eq('user_id', user.id),
-      supabase.from('reserve').delete().eq('user_id', user.id)
+      supabase.from('reserve').delete().eq('user_id', user.id),
+      supabase.from('motorista_registros').delete().eq('user_id', user.id)
     ]);
 
     // Insert seed data
@@ -726,7 +800,7 @@ document.querySelector("#resetData").addEventListener("click", async () => {
 
 // App Initialization
 if (isConfigured) {
-  supabase.auth.onAuthStateChange((event, session) => {
+  supabase.auth.onAuthStateChange(() => {
     checkAuth();
   });
   

@@ -19,10 +19,26 @@
 
         <nav class="nav-tabs" aria-label="Seções">
           <button class="nav-tab active" data-tab="dashboard" type="button">Dashboard</button>
-          <button class="nav-tab" data-tab="lancamentos" type="button">Lançamentos</button>
-          <button class="nav-tab" data-tab="contas" type="button">Contas Fixas</button>
-          <button class="nav-tab" data-tab="metas" type="button">Metas</button>
-          <button class="nav-tab" data-tab="reserva" type="button">Reserva</button>
+
+          <button class="nav-tab" data-tab="lancamentos" type="button">
+            Lançamentos
+          </button>
+
+          <button class="nav-tab" data-tab="contas" type="button">
+            Contas Fixas
+          </button>
+
+          <button class="nav-tab" data-tab="metas" type="button">
+            Metas
+          </button>
+
+          <button class="nav-tab" data-tab="reserva" type="button">
+            Reserva
+          </button>
+
+          <button class="nav-tab" data-tab="motorista" type="button">
+            🚗 Motorista
+          </button>
         </nav>
 
         <div class="sidebar-footer">
@@ -240,6 +256,202 @@
             </table>
           </div>
         </section>
+        <!-- ==========================================================
+     MÓDULO MOTORISTA DE APLICATIVO
+     ========================================================== -->
+
+<section id="motorista" class="view">
+
+  <!-- =========================
+       Cabeçalho
+  ========================== -->
+
+  <header class="page-header">
+
+    <div>
+
+      <h2>🚗 Motorista de Aplicativo</h2>
+
+      <p>
+        Controle diário de ganhos, combustível e desempenho.
+      </p>
+
+    </div>
+
+  </header>
+
+  <!-- =========================
+       Resumo Financeiro
+  ========================== -->
+
+  <section class="summary-grid">
+
+    <article class="summary-card">
+
+      <span>Total Bruto</span>
+
+      <strong id="driverTotalBruto">
+
+        R$ 0,00
+
+      </strong>
+
+    </article>
+
+    <article class="summary-card">
+
+      <span>Total Líquido</span>
+
+      <strong id="driverTotalLiquido">
+
+        R$ 0,00
+
+      </strong>
+
+    </article>
+
+    <article class="summary-card">
+
+      <span>Combustível</span>
+
+      <strong id="driverTotalCombustivel">
+
+        R$ 0,00
+
+      </strong>
+
+    </article>
+
+    <article class="summary-card">
+
+      <span>Dias Trabalhados</span>
+
+      <strong id="driverDias">
+
+        0
+
+      </strong>
+
+    </article>
+
+  </section>
+
+  <!-- =========================
+       Formulário
+  ========================== -->
+
+  <section class="card">
+
+    <h3>Novo Registro</h3>
+
+    <form id="driverForm" class="entry-form">
+
+      <div class="form-grid">
+
+        <input
+          type="date"
+          id="driverData"
+          required>
+
+        <input
+          type="number"
+          id="driverUber"
+          placeholder="Ganhos Uber"
+          step="0.01">
+
+        <input
+          type="number"
+          id="driver99"
+          placeholder="Ganhos 99"
+          step="0.01">
+
+        <input
+          type="number"
+          id="driverKm"
+          placeholder="Quilometragem"
+          step="0.01">
+
+        <input
+          type="number"
+          id="driverGasolina"
+          placeholder="Preço gasolina"
+          step="0.01">
+
+        <input
+          type="number"
+          id="driverConsumo"
+          placeholder="Consumo (KM/L)"
+          step="0.01">
+
+      </div>
+
+      <button
+        type="submit"
+        class="primary">
+
+        Salvar Registro
+
+      </button>
+
+    </form>
+
+  </section>
+
+  <!-- =========================
+       Tabela
+  ========================== -->
+
+  <section class="card">
+
+    <h3>Histórico</h3>
+
+    <div class="table-wrap">
+
+      <table>
+
+        <thead>
+
+          <tr>
+
+            <th>Data</th>
+
+            <th>Uber</th>
+
+            <th>99</th>
+
+            <th>KM</th>
+
+            <th>Gasolina</th>
+
+            <th>Consumo</th>
+
+            <th>Bruto</th>
+
+            <th>Combustível</th>
+
+            <th>Líquido</th>
+
+            <th></th>
+
+          </tr>
+
+        </thead>
+
+        <tbody id="driverTable">
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </section>
+
+</section>
+
+<!-- ==========================================================
+     FIM DO MÓDULO MOTORISTA
+     ========================================================== -->
       </main>
     </div>
 
