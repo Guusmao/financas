@@ -506,6 +506,9 @@ function goalCard(goal) {
 }
 
 function renderEntries() {
+  const lancamentosTable = document.querySelector("#lancamentosTable");
+  if (!lancamentosTable) return;
+
   // Filtra lançamentos exibidos na tabela de lançamentos por mês ativo
   const rows = state.entries.filter((entry) => entry.date.startsWith(selectedMonth)).slice().sort((a, b) => b.date.localeCompare(a.date)).map((entry) => `<tr>
     <td>${dateLabel(entry.date)}</td>
@@ -517,7 +520,7 @@ function renderEntries() {
     <td>${entry.paid ? "☑" : "☐"}</td>
     <td><button class="row-action" data-delete-entry="${entry.id}" type="button">Excluir</button></td>
   </tr>`);
-  document.querySelector("#lancamentosTable").innerHTML = rows.join("");
+  lancamentosTable.innerHTML = rows.join("");
 }
 
 function renderBills() {
@@ -568,7 +571,6 @@ function switchTab(tabId) {
 
 function render() {
   renderDashboard();
-  renderEntries();
   renderBills();
   renderGoals();
   renderReserve();
@@ -802,42 +804,45 @@ logoutBtn.addEventListener("click", async () => {
 });
 
 // Form Submissions
-document.querySelector("#lancamentoForm").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!supabase || !user) return;
-  
-  const data = formData(event.currentTarget);
-  const allowedTypes = ["Entrada", "Saída", "Reserva"];
-  const type = allowedTypes.includes(data.type) ? data.type : "Saída";
-  const category = config.categories.includes(data.category) ? data.category : "Outros";
-  const payment = config.payments.includes(data.payment) ? data.payment : "PIX";
-  const entry = {
-    user_id: user.id,
-    date: data.date,
-    type,
-    category,
-    description: normalizeTextInput(data.description, 120),
-    payment,
-    amount: normalizeAmount(data.amount),
-    paid: event.currentTarget.paid.checked,
-    note: normalizeTextInput(data.note, 240),
-  };
-  
-  const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
-  submitBtn.disabled = true;
-  
-  const { data: inserted, error } = await supabase.from('entries').insert(entry).select();
-  submitBtn.disabled = false;
+const lancamentoForm = document.querySelector("#lancamentoForm");
+if (lancamentoForm) {
+  lancamentoForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!supabase || !user) return;
+    
+    const data = formData(event.currentTarget);
+    const allowedTypes = ["Entrada", "Saída", "Reserva"];
+    const type = allowedTypes.includes(data.type) ? data.type : "Saída";
+    const category = config.categories.includes(data.category) ? data.category : "Outros";
+    const payment = config.payments.includes(data.payment) ? data.payment : "PIX";
+    const entry = {
+      user_id: user.id,
+      date: data.date,
+      type,
+      category,
+      description: normalizeTextInput(data.description, 120),
+      payment,
+      amount: normalizeAmount(data.amount),
+      paid: event.currentTarget.paid.checked,
+      note: normalizeTextInput(data.note, 240),
+    };
+    
+    const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    
+    const { error } = await supabase.from('entries').insert(entry).select();
+    submitBtn.disabled = false;
 
-  if (error) {
-    alert("Erro ao salvar lançamento: " + error.message);
-    return;
-  }
+    if (error) {
+      alert("Erro ao salvar lançamento: " + error.message);
+      return;
+    }
 
-  event.currentTarget.reset();
-  initForms();
-  await loadData();
-});
+    event.currentTarget.reset();
+    initForms();
+    await loadData();
+  });
+}
 
 document.querySelector("#contaForm").addEventListener("submit", async (event) => {
   event.preventDefault();
