@@ -438,6 +438,30 @@ select {
   grid-template-columns: repeat(6, minmax(120px, 1fr)) 120px;
 }
 
+.bills-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.bills-toolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.bills-toolbar select {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #cfd7e3;
+  border-radius: 6px;
+  background: #fff;
+}
+
 .driver-form {
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
@@ -586,6 +610,11 @@ td {
   .entry-form,
   .entry-form.compact {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .bills-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .driver-form {

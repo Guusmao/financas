@@ -52,6 +52,8 @@ let user = null;
 let selectedMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
 let showOnlyUnpaidBills = false;
 let editingBillId = null;
+let billsSortBy = "dueDay";
+let billsSortDirection = "asc";
 
 function money(value) {
   return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -90,7 +92,32 @@ function normalizeTextInput(value, maxLength = 120) {
 }
 
 function normalizeAmount(value) {
-  const parsed = Number(value);
+  const raw = String(value ?? "").trim();
+  if (!raw) return 0;
+
+  const sanitized = raw.replace(/\s/g, "").replace(/R\$/gi, "").replace(/[^\d,.-]/g, "");
+  const lastComma = sanitized.lastIndexOf(",");
+  const lastDot = sanitized.lastIndexOf(".");
+  const sepIndex = Math.max(lastComma, lastDot);
+  const hasBothSeparators = lastComma !== -1 && lastDot !== -1;
+
+  let normalized = "";
+  if (sepIndex > -1) {
+    const decimalDigits = sanitized.slice(sepIndex + 1).replace(/\D/g, "").length;
+
+    // Ex.: "1.234" ou "1,234" sem outra separação tende a ser milhar, não decimal.
+    if (!hasBothSeparators && decimalDigits === 3) {
+      normalized = sanitized.replace(/[^\d-]/g, "");
+    } else {
+      const intPart = sanitized.slice(0, sepIndex).replace(/\D/g, "");
+      const decimalPart = sanitized.slice(sepIndex + 1).replace(/\D/g, "");
+      normalized = `${intPart || "0"}.${decimalPart || "0"}`;
+    }
+  } else {
+    normalized = sanitized.replace(/[^\d-]/g, "");
+  }
+
+  const parsed = Number(normalized);
   if (!Number.isFinite(parsed) || parsed < 0) return 0;
   return parsed;
 }
@@ -170,6 +197,74 @@ function billEntryForMonth(bill, month) {
   )) || null;
 }
 
+function billStatusForMonth(bill, month) {
+  const monthEntry = billEntryForMonth(bill, month);
+  if (monthEntry?.paid) {
+    return { key: "paid", label: "Pago", className: "ok" };
+  }
+
+  const dueDate = buildDueDateForMonth(month, bill.dueDay);
+  if (dueDate < todayIso()) {
+    return { key: "overdue", label: "Atrasada", className: "warn" };
+  }
+
+  return { key: "unpaid", label: "Não pago", className: "unpaid" };
+}
+
+function sortBills(bills) {
+  const statusRank = { overdue: 0, unpaid: 1, paid: 2 };
+  const direction = billsSortDirection === "desc" ? -1 : 1;
+
+  return [...bills].sort((a, b) => {
+    let comparison = 0;
+
+    if (billsSortBy === "amount") {
+      comparison = Number(a.amount) - Number(b.amount);
+    } else if (billsSortBy === "name") {
+      comparison = a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" });
+    } else if (billsSortBy === "category") {
+      comparison = a.category.localeCompare(b.category, "pt-BR", { sensitivity: "base" });
+    } else if (billsSortBy === "status") {
+      const aStatus = billStatusForMonth(a, selectedMonth);
+      const bStatus = billStatusForMonth(b, selectedMonth);
+      comparison = (statusRank[aStatus.key] ?? 99) - (statusRank[bStatus.key] ?? 99);
+    } else {
+      comparison = Number(a.dueDay) - Number(b.dueDay);
+    }
+
+    if (comparison === 0) {
+      comparison = a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" });
+    }
+
+    return comparison * direction;
+  });
+}
+
+function initBillsSortingControls() {
+  const sortBySelect = document.querySelector("#billsSortBy");
+  const directionSelect = document.querySelector("#billsSortDirection");
+  if (!sortBySelect || !directionSelect) return;
+
+  sortBySelect.value = billsSortBy;
+  directionSelect.value = billsSortDirection;
+
+  if (!sortBySelect.dataset.bound) {
+    sortBySelect.addEventListener("change", (event) => {
+      billsSortBy = event.target.value;
+      renderBills();
+    });
+    sortBySelect.dataset.bound = "1";
+  }
+
+  if (!directionSelect.dataset.bound) {
+    directionSelect.addEventListener("change", (event) => {
+      billsSortDirection = event.target.value;
+      renderBills();
+    });
+    directionSelect.dataset.bound = "1";
+  }
+}
+
 let isSyncingInstallments = false;
 
 async function ensureInstallmentsForMonth() {
@@ -221,6 +316,18 @@ function fillSelect(select, options) {
   select.innerHTML = options.map((item) => `<option>${item}</option>`).join("");
 }
 
+function syncInstallmentsVisibility(contaForm) {
+  if (!contaForm) return;
+  const recurrenceSelect = contaForm.querySelector('select[name="recurrence"]');
+  const installmentsInput = contaForm.querySelector('input[name="installments"]');
+  if (!recurrenceSelect || !installmentsInput) return;
+
+  const isInstallment = recurrenceSelect.value === "Parcelado";
+  installmentsInput.hidden = !isInstallment;
+  installmentsInput.required = isInstallment;
+  installmentsInput.disabled = !isInstallment;
+}
+
 function initForms() {
   document.querySelectorAll('select[name="category"]').forEach((select) => fillSelect(select, config.categories));
   document.querySelectorAll('select[name="payment"]').forEach((select) => fillSelect(select, config.payments));
@@ -231,18 +338,11 @@ function initForms() {
   const contaForm = document.querySelector("#contaForm");
   if (contaForm && !contaForm.dataset.installmentsBound) {
     const recurrenceSelect = contaForm.querySelector('select[name="recurrence"]');
-    const installmentsInput = contaForm.querySelector('input[name="installments"]');
-
-    const toggleInstallments = () => {
-      const isInstallment = recurrenceSelect.value === "Parcelado";
-      installmentsInput.hidden = !isInstallment;
-      installmentsInput.required = isInstallment;
-    };
-
-    recurrenceSelect.addEventListener("change", toggleInstallments);
-    toggleInstallments();
+    recurrenceSelect?.addEventListener("change", () => syncInstallmentsVisibility(contaForm));
     contaForm.dataset.installmentsBound = "1";
   }
+
+  syncInstallmentsVisibility(contaForm);
 }
 
 function setBillFormMode(isEditing) {
@@ -297,10 +397,6 @@ function renderDashboard() {
   document.querySelector("#todayLabel").textContent = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
 
   // Contas fixas pagas/pendentes baseadas apenas no mês selecionado
-  const monthlyPaidEntries = state.entries.filter((entry) => entry.paid && entry.date.startsWith(selectedMonth));
-  const paidCategories = new Set(monthlyPaidEntries.map((entry) => entry.category));
-  const paidDescriptions = new Set(monthlyPaidEntries.map((entry) => entry.description));
-  
   const bills = state.bills.filter((bill) => bill.active);
   const toggleBtn = document.querySelector("#toggleUnpaidBills");
   if (toggleBtn) {
@@ -309,18 +405,17 @@ function renderDashboard() {
   }
 
   const billsWithStatus = bills.map((bill) => {
-    const monthEntry = billEntryForMonth(bill, selectedMonth);
-    const paid = monthEntry ? !!monthEntry.paid : (paidCategories.has(bill.name) || paidCategories.has(bill.category) || paidDescriptions.has(bill.name));
-    return { bill, paid };
+    const status = billStatusForMonth(bill, selectedMonth);
+    return { bill, status };
   });
 
-  const visibleBills = showOnlyUnpaidBills ? billsWithStatus.filter((item) => !item.paid) : billsWithStatus;
+  const visibleBills = showOnlyUnpaidBills ? billsWithStatus.filter((item) => item.status.key !== "paid") : billsWithStatus;
   document.querySelector("#contasStatus").textContent = `${visibleBills.length}/${bills.length}`;
-  document.querySelector("#dashboardContas").innerHTML = visibleBills.map(({ bill, paid }) => {
+  document.querySelector("#dashboardContas").innerHTML = visibleBills.map(({ bill, status }) => {
     const recurrenceText = recurrenceLabel(bill.recurrence, selectedMonth);
     return `<div class="list-row">
       <div><strong>${escapeHtml(bill.name)}</strong><small>${escapeHtml(bill.category)} · vence dia ${bill.dueDay} · ${escapeHtml(recurrenceText)}</small></div>
-      <div><span class="amount">${money(bill.amount)}</span><span class="status ${paid ? "ok" : "unpaid"}">${paid ? "Pago" : "Não pago"}</span></div>
+      <div><span class="amount">${money(bill.amount)}</span><span class="status ${status.className}">${status.label}</span></div>
     </div>`;
   }).join("") || emptyRow(showOnlyUnpaidBills ? "Nenhuma conta não paga" : "Nenhuma conta fixa");
 
@@ -384,17 +479,17 @@ function renderEntries() {
 }
 
 function renderBills() {
-  const orderedBills = [...state.bills].reverse();
+  const orderedBills = sortBills(state.bills);
   document.querySelector("#contasList").innerHTML = orderedBills.map((bill) => {
-    const monthEntry = billEntryForMonth(bill, selectedMonth);
-    const paid = monthEntry ? !!monthEntry.paid : false;
+    const status = billStatusForMonth(bill, selectedMonth);
+    const paid = status.key === "paid";
     return `<div class="data-card">
       <div>
         <strong>${escapeHtml(bill.name)}</strong>
         <small>${escapeHtml(bill.category)} · ${money(bill.amount)} · dia ${bill.dueDay} · ${escapeHtml(recurrenceLabel(bill.recurrence, selectedMonth))} · ${bill.active ? "Ativa" : "Inativa"}</small>
       </div>
       <div class="bill-actions">
-        <span class="status ${paid ? "ok" : "unpaid"}">${paid ? "Pago" : "Não pago"}</span>
+        <span class="status ${status.className}">${status.label}</span>
         <button class="row-action neutral" data-edit-bill="${bill.id}" type="button">Editar</button>
         <button class="row-action ${paid ? "neutral" : "pay"}" data-toggle-bill-paid="${bill.id}" type="button">${paid ? "Desmarcar" : "Marcar pago"}</button>
         <button class="row-action" data-delete-bill="${bill.id}" type="button">Excluir</button>
@@ -681,7 +776,7 @@ document.querySelector("#lancamentoForm").addEventListener("submit", async (even
     category,
     description: normalizeTextInput(data.description, 120),
     payment,
-    amount: Number(data.amount),
+    amount: normalizeAmount(data.amount),
     paid: event.currentTarget.paid.checked,
     note: normalizeTextInput(data.note, 240),
   };
@@ -715,7 +810,7 @@ document.querySelector("#contaForm").addEventListener("submit", async (event) =>
     user_id: user.id,
     name: normalizeTextInput(data.name, 80),
     category: config.categories.includes(data.category) ? data.category : "Outros",
-    amount: Number(data.amount),
+    amount: normalizeAmount(data.amount),
     due_day: Number(data.dueDay),
     recurrence,
     active: event.currentTarget.active.checked,
@@ -747,8 +842,8 @@ document.querySelector("#metaForm").addEventListener("submit", async (event) => 
   const goal = {
     user_id: user.id,
     name: normalizeTextInput(data.name, 80),
-    target: Number(data.target),
-    saved: Number(data.saved)
+    target: normalizeAmount(data.target),
+    saved: normalizeAmount(data.saved)
   };
 
   const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
@@ -775,7 +870,7 @@ document.querySelector("#reservaForm").addEventListener("submit", async (event) 
   const reserve = {
     user_id: user.id,
     date: data.date,
-    amount: Number(data.amount),
+    amount: normalizeAmount(data.amount),
     type: reserveType,
     note: normalizeTextInput(data.note, 240)
   };
@@ -811,10 +906,10 @@ document.querySelector("#driverForm").addEventListener("submit", async (event) =
   const registro = {
     user_id: user.id,
     data: document.querySelector("#driverData").value,
-    uber: Number(document.querySelector("#driverUber").value || 0),
-    noventa_nove: Number(document.querySelector("#driver99").value || 0),
+    uber: normalizeAmount(document.querySelector("#driverUber").value || 0),
+    noventa_nove: normalizeAmount(document.querySelector("#driver99").value || 0),
     quilometragem: Number(document.querySelector("#driverKm").value || 0),
-    preco_gasolina: Number(document.querySelector("#driverGasolina").value || 0),
+    preco_gasolina: normalizeAmount(document.querySelector("#driverGasolina").value || 0),
     consumo_veiculo: Number(document.querySelector("#driverConsumo").value || 0)
   };
 
@@ -1118,4 +1213,5 @@ if (isConfigured) {
 }
 
 initForms();
+initBillsSortingControls();
 render();
