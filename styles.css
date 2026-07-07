@@ -327,6 +327,12 @@ select {
   display: block;
   margin-top: 2px;
   color: var(--muted);
+  font-size: 14px;
+}
+
+.list-row strong,
+.data-card strong {
+  font-size: 17px;
 }
 
 .amount {
@@ -519,6 +525,7 @@ td {
   border-bottom: 1px solid var(--line);
   text-align: left;
   white-space: nowrap;
+  font-size: 15px;
 }
 
 th {
@@ -688,7 +695,7 @@ td {
 }
 
 .form-group label {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--ink);
 }

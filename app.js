@@ -51,6 +51,7 @@ let state = {
 let user = null;
 let selectedMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
 let showOnlyUnpaidBills = false;
+let editingBillId = null;
 
 function money(value) {
   return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -244,6 +245,23 @@ function initForms() {
   }
 }
 
+function setBillFormMode(isEditing) {
+  const submitBtn = document.querySelector("#contaForm button[type=\"submit\"]");
+  if (submitBtn) {
+    submitBtn.textContent = isEditing ? "Salvar edição" : "Adicionar";
+  }
+}
+
+function resetBillForm() {
+  editingBillId = null;
+  const contaForm = document.querySelector("#contaForm");
+  if (contaForm) {
+    contaForm.reset();
+  }
+  setBillFormMode(false);
+  initForms();
+}
+
 function totals() {
   // Filtra lançamentos do mês selecionado
   const monthlyEntries = state.entries.filter((entry) => entry.paid && entry.date.startsWith(selectedMonth));
@@ -377,6 +395,7 @@ function renderBills() {
       </div>
       <div class="bill-actions">
         <span class="status ${paid ? "ok" : "unpaid"}">${paid ? "Pago" : "Não pago"}</span>
+        <button class="row-action neutral" data-edit-bill="${bill.id}" type="button">Editar</button>
         <button class="row-action ${paid ? "neutral" : "pay"}" data-toggle-bill-paid="${bill.id}" type="button">${paid ? "Desmarcar" : "Marcar pago"}</button>
         <button class="row-action" data-delete-bill="${bill.id}" type="button">Excluir</button>
       </div>
@@ -678,12 +697,9 @@ document.querySelector("#lancamentoForm").addEventListener("submit", async (even
     return;
   }
 
-  if (inserted && inserted.length > 0) {
-    state.entries.push({ ...inserted[0], amount: Number(inserted[0].amount) });
-    event.currentTarget.reset();
-    initForms();
-    render();
-  }
+  event.currentTarget.reset();
+  initForms();
+  await loadData();
 });
 
 document.querySelector("#contaForm").addEventListener("submit", async (event) => {
@@ -708,30 +724,19 @@ document.querySelector("#contaForm").addEventListener("submit", async (event) =>
   const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
 
-  const { data: inserted, error } = await supabase.from('bills').insert(bill).select();
+  const query = editingBillId
+    ? supabase.from('bills').update(bill).eq('id', editingBillId).eq('user_id', user.id)
+    : supabase.from('bills').insert(bill).select();
+  const { error } = await query;
   submitBtn.disabled = false;
 
   if (error) {
-    alert("Erro ao salvar conta: " + error.message);
+    alert(`Erro ao ${editingBillId ? "atualizar" : "salvar"} conta: ` + error.message);
     return;
   }
 
-  if (inserted && inserted.length > 0) {
-    const newBill = inserted[0];
-    state.bills.push({
-      id: newBill.id,
-      name: newBill.name,
-      category: newBill.category,
-      amount: Number(newBill.amount),
-      dueDay: newBill.due_day,
-      recurrence: newBill.recurrence,
-      active: newBill.active
-    });
-    event.currentTarget.reset();
-    initForms();
-    await ensureInstallmentsForMonth();
-    render();
-  }
+  resetBillForm();
+  await loadData();
 });
 
 document.querySelector("#metaForm").addEventListener("submit", async (event) => {
@@ -757,11 +762,8 @@ document.querySelector("#metaForm").addEventListener("submit", async (event) => 
     return;
   }
 
-  if (inserted && inserted.length > 0) {
-    state.goals.push({ ...inserted[0], target: Number(inserted[0].target), saved: Number(inserted[0].saved) });
-    event.currentTarget.reset();
-    render();
-  }
+  event.currentTarget.reset();
+  await loadData();
 });
 
 document.querySelector("#reservaForm").addEventListener("submit", async (event) => {
@@ -789,12 +791,9 @@ document.querySelector("#reservaForm").addEventListener("submit", async (event) 
     return;
   }
 
-  if (inserted && inserted.length > 0) {
-    state.reserve.push({ ...inserted[0], amount: Number(inserted[0].amount) });
-    event.currentTarget.reset();
-    initForms();
-    render();
-  }
+  event.currentTarget.reset();
+  initForms();
+  await loadData();
 });
 
 // ======================================================
@@ -840,6 +839,34 @@ document.querySelector("#driverForm").addEventListener("submit", async (event) =
 document.body.addEventListener("click", async (event) => {
   const button = event.target.closest("button");
   if (!button || !user) return;
+
+  const editBillId = button.dataset.editBill;
+  if (editBillId) {
+    const bill = state.bills.find((item) => item.id === editBillId);
+    if (!bill) return;
+
+    const contaForm = document.querySelector("#contaForm");
+    if (!contaForm) return;
+
+    editingBillId = bill.id;
+    const recurrenceSelect = contaForm.querySelector('select[name="recurrence"]');
+    const installmentsInput = contaForm.querySelector('input[name="installments"]');
+    const installmentData = parseInstallmentRecurrence(bill.recurrence);
+
+    contaForm.querySelector('input[name="name"]').value = bill.name;
+    contaForm.querySelector('select[name="category"]').value = bill.category;
+    contaForm.querySelector('input[name="amount"]').value = String(bill.amount);
+    contaForm.querySelector('input[name="dueDay"]').value = String(bill.dueDay);
+    recurrenceSelect.value = installmentData ? "Parcelado" : bill.recurrence;
+    installmentsInput.value = String(installmentData?.totalInstallments || 12);
+    contaForm.querySelector('input[name="active"]').checked = !!bill.active;
+
+    recurrenceSelect.dispatchEvent(new Event("change"));
+    setBillFormMode(true);
+    switchTab("contas");
+    contaForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
 
   const toggleBillPaidId = button.dataset.toggleBillPaid;
   if (toggleBillPaidId) {
@@ -919,6 +946,9 @@ document.body.addEventListener("click", async (event) => {
       button.disabled = true;
       const { error } = await supabase.from(map.table).delete().eq('id', id);
       if (!error) {
+        if (map.key === "deleteBill" && id === editingBillId) {
+          resetBillForm();
+        }
         state[map.stateKey] = state[map.stateKey].filter((item) => item.id !== id);
         render();
       } else {
