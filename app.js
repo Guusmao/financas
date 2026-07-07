@@ -122,6 +122,22 @@ function normalizeAmount(value) {
   return parsed;
 }
 
+function toFiniteNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function yearMonth(value) {
+  const text = String(value || "").trim();
+  if (/^\d{4}-\d{2}/.test(text)) return text.slice(0, 7);
+
+  // Fallback para formatos como dd/mm/yyyy.
+  const brMatch = text.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (brMatch) return `${brMatch[3]}-${brMatch[2]}`;
+
+  return "";
+}
+
 function encodeInstallmentRecurrence(totalInstallments, startMonth) {
   const total = Math.max(2, Math.min(Number(totalInstallments) || 2, 120));
   return `Parcelado|${total}|${startMonth}`;
@@ -386,23 +402,23 @@ function resetBillForm() {
 
 function totals() {
   // Filtra lançamentos do mês selecionado
-  const monthlyEntries = state.entries.filter((entry) => entry.paid && entry.date.startsWith(selectedMonth));
-  const entradasLancamentos = monthlyEntries.filter((entry) => entry.type === "Entrada").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const monthlyEntries = state.entries.filter((entry) => entry.paid && yearMonth(entry.date) === selectedMonth);
+  const entradasLancamentos = monthlyEntries.filter((entry) => entry.type === "Entrada").reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
   const entradasMotorista = state.motorista
-    .filter((registro) => registro.data.startsWith(selectedMonth))
-    .reduce((sum, registro) => sum + Number(registro.uber) + Number(registro.noventa_nove), 0);
+    .filter((registro) => yearMonth(registro.data) === selectedMonth)
+    .reduce((sum, registro) => sum + toFiniteNumber(registro.uber) + toFiniteNumber(registro.noventa_nove), 0);
   const entradas = entradasLancamentos + entradasMotorista;
-  const saidas = monthlyEntries.filter((entry) => entry.type === "Saída").reduce((sum, entry) => sum + Number(entry.amount), 0);
+  const saidas = monthlyEntries.filter((entry) => entry.type === "Saída").reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
   
   // Reserva do mês: lançamentos de Reserva + movimentos de reserva do mês
-  const reservaLancamentosMes = monthlyEntries.filter((entry) => entry.type === "Reserva").reduce((sum, entry) => sum + Number(entry.amount), 0);
-  const reservaMovimentosMes = state.reserve.filter((item) => item.date.startsWith(selectedMonth)).reduce((sum, item) => sum + (item.type === "Entrada" ? Number(item.amount) : -Number(item.amount)), 0);
+  const reservaLancamentosMes = monthlyEntries.filter((entry) => entry.type === "Reserva").reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
+  const reservaMovimentosMes = state.reserve.filter((item) => yearMonth(item.date) === selectedMonth).reduce((sum, item) => sum + (item.type === "Entrada" ? toFiniteNumber(item.amount) : -toFiniteNumber(item.amount)), 0);
   const reservaMes = reservaLancamentosMes + reservaMovimentosMes;
   
   // Reserva acumulada (todos os tempos)
   const allPaidEntries = state.entries.filter((entry) => entry.paid);
-  const reservaLancamentosAcumulado = allPaidEntries.filter((entry) => entry.type === "Reserva").reduce((sum, entry) => sum + Number(entry.amount), 0);
-  const reservaMovimentosAcumulado = state.reserve.reduce((sum, item) => sum + (item.type === "Entrada" ? Number(item.amount) : -Number(item.amount)), 0);
+  const reservaLancamentosAcumulado = allPaidEntries.filter((entry) => entry.type === "Reserva").reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
+  const reservaMovimentosAcumulado = state.reserve.reduce((sum, item) => sum + (item.type === "Entrada" ? toFiniteNumber(item.amount) : -toFiniteNumber(item.amount)), 0);
   const reservaAcumulada = reservaLancamentosAcumulado + reservaMovimentosAcumulado;
 
   return { 
