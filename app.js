@@ -767,6 +767,8 @@ const authSubtitle = document.querySelector("#auth-subtitle");
 const authError = document.querySelector("#auth-error");
 const logoutBtn = document.querySelector("#logoutBtn");
 const installAppBtn = document.querySelector("#installAppBtn");
+const installAppTextBtn = document.querySelector("#installAppTextBtn");
+const installButtons = [installAppBtn, installAppTextBtn].filter(Boolean);
 let deferredInstallPrompt = null;
 
 function isIosDevice() {
@@ -778,10 +780,12 @@ function isInStandaloneMode() {
 }
 
 function updateInstallButtonVisibility() {
-  if (!installAppBtn) return;
+  if (!installButtons.length) return;
   const canShowPrompt = !!deferredInstallPrompt;
   const canShowIosHint = isIosDevice() && !isInStandaloneMode();
-  installAppBtn.classList.toggle("hidden", !(canShowPrompt || canShowIosHint));
+  installButtons.forEach((button) => {
+    button.classList.toggle("hidden", !(canShowPrompt || canShowIosHint));
+  });
 }
 
 window.addEventListener("beforeinstallprompt", (event) => {
@@ -795,7 +799,7 @@ window.addEventListener("appinstalled", () => {
   updateInstallButtonVisibility();
 });
 
-installAppBtn?.addEventListener("click", async () => {
+const onInstallClick = async () => {
   if (deferredInstallPrompt) {
     deferredInstallPrompt.prompt();
     await deferredInstallPrompt.userChoice;
@@ -807,6 +811,10 @@ installAppBtn?.addEventListener("click", async () => {
   if (isIosDevice() && !isInStandaloneMode()) {
     alert("No iPhone/iPad: toque em Compartilhar no Safari e escolha 'Adicionar à Tela de Início'.");
   }
+};
+
+installButtons.forEach((button) => {
+  button.addEventListener("click", onInstallClick);
 });
 
 if (!isConfigured) {
