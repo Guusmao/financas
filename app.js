@@ -571,6 +571,7 @@ function switchTab(tabId) {
 
 function render() {
   renderDashboard();
+  renderEntries();
   renderBills();
   renderGoals();
   renderReserve();

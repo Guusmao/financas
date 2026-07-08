@@ -29,6 +29,10 @@
         <nav class="nav-tabs" aria-label="Seções">
           <button class="nav-tab active" data-tab="dashboard" type="button">Dashboard</button>
 
+          <button class="nav-tab" data-tab="lancamentos" type="button">
+            Outros gastos
+          </button>
+
           <button class="nav-tab" data-tab="contas" type="button">
             Contas Fixas
           </button>
@@ -152,6 +156,47 @@
             </div>
 
           </section>
+        </section>
+
+        <section id="lancamentos" class="view">
+          <header class="page-header">
+            <div>
+              <h2>Outros gastos</h2>
+              <p>Registre compras, contas avulsas e ajustes do mês</p>
+            </div>
+          </header>
+          <form id="lancamentoForm" class="entry-form">
+            <input type="date" name="date" required />
+            <select name="type" required>
+              <option>Saída</option>
+              <option>Entrada</option>
+              <option>Reserva</option>
+            </select>
+            <select name="category" required></select>
+            <input name="description" placeholder="Descrição" required />
+            <select name="payment" required></select>
+            <input name="amount" type="text" inputmode="decimal" placeholder="Valor (ex: 1.234,56)" required />
+            <label class="check-field"><input name="paid" type="checkbox" checked /> Pago</label>
+            <input name="note" placeholder="Observação" />
+            <button type="submit">Adicionar</button>
+          </form>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Tipo</th>
+                  <th>Categoria</th>
+                  <th>Descrição</th>
+                  <th>Forma</th>
+                  <th>Valor</th>
+                  <th>Pago</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="lancamentosTable"></tbody>
+            </table>
+          </div>
         </section>
 
         <section id="contas" class="view">
