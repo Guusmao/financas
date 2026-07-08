@@ -451,6 +451,25 @@ function renderDashboard() {
     return { bill, status };
   });
 
+  const billsPaidCount = billsWithStatus.filter((item) => item.status.key === "paid").length;
+  const billsOverdueCount = billsWithStatus.filter((item) => item.status.key === "overdue").length;
+  const otherExpensesTotal = state.entries
+    .filter((entry) => entry.type === "Saída" && yearMonth(entry.date) === selectedMonth)
+    .filter((entry) => !String(entry.note || "").toLowerCase().includes("conta fixa"))
+    .reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
+  const driverIncomeTotal = state.motorista
+    .filter((registro) => yearMonth(registro.data) === selectedMonth)
+    .reduce((sum, registro) => sum + toFiniteNumber(registro.uber) + toFiniteNumber(registro.noventa_nove), 0);
+
+  const kpiBillsPaid = document.querySelector("#kpiBillsPaid");
+  const kpiBillsOverdue = document.querySelector("#kpiBillsOverdue");
+  const kpiOtherExpenses = document.querySelector("#kpiOtherExpenses");
+  const kpiDriverIncome = document.querySelector("#kpiDriverIncome");
+  if (kpiBillsPaid) kpiBillsPaid.textContent = String(billsPaidCount);
+  if (kpiBillsOverdue) kpiBillsOverdue.textContent = String(billsOverdueCount);
+  if (kpiOtherExpenses) kpiOtherExpenses.textContent = money(otherExpensesTotal);
+  if (kpiDriverIncome) kpiDriverIncome.textContent = money(driverIncomeTotal);
+
   const visibleBills = showOnlyUnpaidBills ? billsWithStatus.filter((item) => item.status.key !== "paid") : billsWithStatus;
   document.querySelector("#contasStatus").textContent = `${visibleBills.length}/${bills.length}`;
   document.querySelector("#dashboardContas").innerHTML = visibleBills.map(({ bill, status }) => {
@@ -462,7 +481,12 @@ function renderDashboard() {
   }).join("") || emptyRow(showOnlyUnpaidBills ? "Nenhuma conta não paga" : "Nenhuma conta fixa");
 
   // Gastos do mês selecionado
-  const gastos = state.entries.filter((entry) => entry.type === "Saída" && entry.date.startsWith(selectedMonth)).slice().sort((a, b) => b.date.localeCompare(a.date)).slice(0, 6);
+  const gastos = state.entries
+    .filter((entry) => entry.type === "Saída" && entry.date.startsWith(selectedMonth))
+    .filter((entry) => !String(entry.note || "").toLowerCase().includes("conta fixa"))
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 6);
   document.querySelector("#gastosStatus").textContent = `${gastos.length} recentes`;
   document.querySelector("#dashboardGastos").innerHTML = gastos.map((entry) => `<div class="list-row">
     <div><strong>${escapeHtml(entry.description)}</strong><small>${dateLabel(entry.date)} · ${escapeHtml(entry.category)} · ${escapeHtml(entry.payment)}</small></div>
@@ -510,7 +534,12 @@ function renderEntries() {
   if (!lancamentosTable) return;
 
   // Filtra lançamentos exibidos na tabela de lançamentos por mês ativo
-  const rows = state.entries.filter((entry) => entry.date.startsWith(selectedMonth)).slice().sort((a, b) => b.date.localeCompare(a.date)).map((entry) => `<tr>
+  const rows = state.entries
+    .filter((entry) => entry.date.startsWith(selectedMonth))
+    .filter((entry) => !String(entry.note || "").toLowerCase().includes("conta fixa"))
+    .slice()
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map((entry) => `<tr>
     <td>${dateLabel(entry.date)}</td>
     <td>${escapeHtml(entry.type)}</td>
     <td>${escapeHtml(entry.category)}</td>
