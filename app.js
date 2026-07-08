@@ -737,6 +737,48 @@ const authSwitchText = document.querySelector("#auth-switch-text");
 const authSubtitle = document.querySelector("#auth-subtitle");
 const authError = document.querySelector("#auth-error");
 const logoutBtn = document.querySelector("#logoutBtn");
+const installAppBtn = document.querySelector("#installAppBtn");
+let deferredInstallPrompt = null;
+
+function isIosDevice() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent);
+}
+
+function isInStandaloneMode() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function updateInstallButtonVisibility() {
+  if (!installAppBtn) return;
+  const canShowPrompt = !!deferredInstallPrompt;
+  const canShowIosHint = isIosDevice() && !isInStandaloneMode();
+  installAppBtn.classList.toggle("hidden", !(canShowPrompt || canShowIosHint));
+}
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  updateInstallButtonVisibility();
+});
+
+window.addEventListener("appinstalled", () => {
+  deferredInstallPrompt = null;
+  updateInstallButtonVisibility();
+});
+
+installAppBtn?.addEventListener("click", async () => {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    updateInstallButtonVisibility();
+    return;
+  }
+
+  if (isIosDevice() && !isInStandaloneMode()) {
+    alert("No iPhone/iPad: toque em Compartilhar no Safari e escolha 'Adicionar à Tela de Início'.");
+  }
+});
 
 if (!isConfigured) {
   authError.innerHTML = `<strong>Configuração necessária!</strong><br>Use <code>.env</code> (Vite) ou <code>config.js</code> (Go Live) com URL e chave anon do Supabase. Veja <code>.env.example</code> e <code>config.example.js</code>.`;
@@ -1276,6 +1318,15 @@ if (isConfigured) {
   checkAuth();
 }
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch((error) => {
+      console.error("Falha ao registrar service worker:", error);
+    });
+  });
+}
+
 initForms();
 initBillsSortingControls();
+updateInstallButtonVisibility();
 render();

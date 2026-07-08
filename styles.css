@@ -125,6 +125,16 @@ select {
   color: #ffe5e5;
 }
 
+.icon-button.install {
+  color: #e7fff0;
+  border-color: rgba(140, 235, 182, 0.7);
+  background: rgba(34, 121, 78, 0.55);
+}
+
+.icon-button.install:hover {
+  background: rgba(34, 121, 78, 0.82);
+}
+
 .main {
   min-width: 0;
   padding: 28px;
