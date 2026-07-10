@@ -972,6 +972,7 @@ if (lancamentoForm) {
     const type = allowedTypes.includes(data.type) ? data.type : "Saída";
     const category = config.categories.includes(data.category) ? data.category : "Outros";
     const payment = config.payments.includes(data.payment) ? data.payment : "PIX";
+    const existingEntry = editingEntryId ? state.entries.find((item) => item.id === editingEntryId) : null;
     const entry = {
       user_id: user.id,
       date: data.date,
@@ -981,7 +982,7 @@ if (lancamentoForm) {
       payment,
       amount: normalizeAmount(data.amount),
       paid: event.currentTarget.paid.checked,
-      note: normalizeTextInput(data.note, 240),
+      note: existingEntry ? (existingEntry.note || "") : "",
     };
     
     const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
@@ -1272,7 +1273,6 @@ document.body.addEventListener("click", async (event) => {
     lancamentoForm.querySelector('select[name="payment"]').value = entry.payment;
     lancamentoForm.querySelector('input[name="amount"]').value = String(entry.amount);
     lancamentoForm.querySelector('input[name="paid"]').checked = !!entry.paid;
-    lancamentoForm.querySelector('input[name="note"]').value = entry.note || "";
 
     setEntryFormMode(true);
     switchTab("lancamentos");
