@@ -591,6 +591,10 @@ select {
   background: #5f6f85;
 }
 
+td .row-action + .row-action {
+  margin-left: 8px;
+}
+
 .table-wrap {
   overflow: auto;
   border: 1px solid var(--line);

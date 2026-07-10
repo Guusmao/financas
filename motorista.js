@@ -61,6 +61,7 @@ export function renderMotorista(registros, selectedMonth, money, dateLabel) {
           <td>${money(combustivel)}</td>
           <td>${money(liquido)}</td>
           <td>
+            <button class="row-action neutral" data-edit-driver="${registro.id}">Editar</button>
             <button class="row-action" data-delete-driver="${registro.id}">Excluir</button>
           </td>
         </tr>

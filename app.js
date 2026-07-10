@@ -52,6 +52,10 @@ let user = null;
 let selectedMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
 let showOnlyUnpaidBills = false;
 let editingBillId = null;
+let editingEntryId = null;
+let editingGoalId = null;
+let editingReserveId = null;
+let editingDriverId = null;
 let billsSortBy = "dueDay";
 let billsSortDirection = "asc";
 
@@ -400,6 +404,70 @@ function resetBillForm() {
   initForms();
 }
 
+function setEntryFormMode(isEditing) {
+  const submitBtn = document.querySelector("#lancamentoForm button[type=\"submit\"]");
+  if (submitBtn) {
+    submitBtn.textContent = isEditing ? "Salvar edição" : "Adicionar";
+  }
+}
+
+function resetEntryForm() {
+  editingEntryId = null;
+  const lancamentoForm = document.querySelector("#lancamentoForm");
+  if (lancamentoForm) {
+    lancamentoForm.reset();
+  }
+  setEntryFormMode(false);
+  initForms();
+}
+
+function setGoalFormMode(isEditing) {
+  const submitBtn = document.querySelector("#metaForm button[type=\"submit\"]");
+  if (submitBtn) {
+    submitBtn.textContent = isEditing ? "Salvar edição" : "Adicionar";
+  }
+}
+
+function resetGoalForm() {
+  editingGoalId = null;
+  const metaForm = document.querySelector("#metaForm");
+  if (metaForm) {
+    metaForm.reset();
+  }
+  setGoalFormMode(false);
+  initForms();
+}
+
+function setReserveFormMode(isEditing) {
+  const submitBtn = document.querySelector("#reservaForm button[type=\"submit\"]");
+  if (submitBtn) {
+    submitBtn.textContent = isEditing ? "Salvar edição" : "Adicionar";
+  }
+}
+
+function resetReserveForm() {
+  editingReserveId = null;
+  const reservaForm = document.querySelector("#reservaForm");
+  if (reservaForm) {
+    reservaForm.reset();
+  }
+  setReserveFormMode(false);
+  initForms();
+}
+
+function setDriverFormMode(isEditing) {
+  const submitBtn = document.querySelector("#driverForm button[type=\"submit\"]");
+  if (submitBtn) {
+    submitBtn.textContent = isEditing ? "Salvar edição" : "Adicionar";
+  }
+}
+
+function resetDriverForm() {
+  editingDriverId = null;
+  clearDriverForm();
+  setDriverFormMode(false);
+}
+
 function totals() {
   // Filtra lançamentos do mês selecionado
   const monthlyEntries = state.entries.filter((entry) => entry.paid && yearMonth(entry.date) === selectedMonth);
@@ -525,7 +593,10 @@ function goalCard(goal) {
       <small>${money(saved)} de ${money(target)} · falta ${money(Math.max(target - saved, 0))}</small>
       <div class="progress"><i style="width:${percent}%"></i></div>
     </div>
-    <button class="row-action" data-delete-goal="${goal.id}" type="button">Excluir</button>
+    <div class="bill-actions">
+      <button class="row-action neutral" data-edit-goal="${goal.id}" type="button">Editar</button>
+      <button class="row-action" data-delete-goal="${goal.id}" type="button">Excluir</button>
+    </div>
   </div>`;
 }
 
@@ -547,7 +618,10 @@ function renderEntries() {
     <td>${escapeHtml(entry.payment)}</td>
     <td>${money(entry.amount)}</td>
     <td>${entry.paid ? "☑" : "☐"}</td>
-    <td><button class="row-action" data-delete-entry="${entry.id}" type="button">Excluir</button></td>
+    <td>
+      <button class="row-action neutral" data-edit-entry="${entry.id}" type="button">Editar</button>
+      <button class="row-action" data-delete-entry="${entry.id}" type="button">Excluir</button>
+    </td>
   </tr>`);
   lancamentosTable.innerHTML = rows.join("");
 }
@@ -584,7 +658,10 @@ function renderReserve() {
     <td>${money(item.amount)}</td>
     <td>${escapeHtml(item.type)}</td>
     <td>${escapeHtml(item.note || "")}</td>
-    <td><button class="row-action" data-delete-reserve="${item.id}" type="button">Excluir</button></td>
+    <td>
+      <button class="row-action neutral" data-edit-reserve="${item.id}" type="button">Editar</button>
+      <button class="row-action" data-delete-reserve="${item.id}" type="button">Excluir</button>
+    </td>
   </tr>`).join("");
 }
 
@@ -909,17 +986,27 @@ if (lancamentoForm) {
     
     const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
-    
-    const { error } = await supabase.from('entries').insert(entry).select();
+
+    const query = editingEntryId
+      ? supabase.from('entries').update(entry).eq('id', editingEntryId).eq('user_id', user.id).select().single()
+      : supabase.from('entries').insert(entry).select().single();
+    const { data: saved, error } = await query;
     submitBtn.disabled = false;
 
     if (error) {
-      alert("Erro ao salvar lançamento: " + error.message);
+      alert(`Erro ao ${editingEntryId ? "atualizar" : "salvar"} lançamento: ` + error.message);
       return;
     }
 
-    event.currentTarget.reset();
-    initForms();
+    if (saved) {
+      const normalized = { ...saved, amount: Number(saved.amount) };
+      state.entries = editingEntryId
+        ? state.entries.map((item) => (item.id === normalized.id ? normalized : item))
+        : [...state.entries, normalized];
+      render();
+    }
+
+    resetEntryForm();
     await loadData();
   });
 }
@@ -947,14 +1034,30 @@ document.querySelector("#contaForm").addEventListener("submit", async (event) =>
   submitBtn.disabled = true;
 
   const query = editingBillId
-    ? supabase.from('bills').update(bill).eq('id', editingBillId).eq('user_id', user.id)
-    : supabase.from('bills').insert(bill).select();
-  const { error } = await query;
+    ? supabase.from('bills').update(bill).eq('id', editingBillId).eq('user_id', user.id).select().single()
+    : supabase.from('bills').insert(bill).select().single();
+  const { data: saved, error } = await query;
   submitBtn.disabled = false;
 
   if (error) {
     alert(`Erro ao ${editingBillId ? "atualizar" : "salvar"} conta: ` + error.message);
     return;
+  }
+
+  if (saved) {
+    const normalized = {
+      id: saved.id,
+      name: saved.name,
+      category: saved.category,
+      amount: Number(saved.amount),
+      dueDay: saved.due_day,
+      recurrence: saved.recurrence,
+      active: saved.active,
+    };
+    state.bills = editingBillId
+      ? state.bills.map((item) => (item.id === normalized.id ? normalized : item))
+      : [...state.bills, normalized];
+    render();
   }
 
   resetBillForm();
@@ -976,15 +1079,26 @@ document.querySelector("#metaForm").addEventListener("submit", async (event) => 
   const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
 
-  const { data: inserted, error } = await supabase.from('goals').insert(goal).select();
+  const query = editingGoalId
+    ? supabase.from('goals').update(goal).eq('id', editingGoalId).eq('user_id', user.id).select().single()
+    : supabase.from('goals').insert(goal).select().single();
+  const { data: saved, error } = await query;
   submitBtn.disabled = false;
 
   if (error) {
-    alert("Erro ao salvar meta: " + error.message);
+    alert(`Erro ao ${editingGoalId ? "atualizar" : "salvar"} meta: ` + error.message);
     return;
   }
 
-  clearDriverForm();
+  if (saved) {
+    const normalized = { ...saved, target: Number(saved.target), saved: Number(saved.saved) };
+    state.goals = editingGoalId
+      ? state.goals.map((item) => (item.id === normalized.id ? normalized : item))
+      : [...state.goals, normalized];
+    render();
+  }
+
+  resetGoalForm();
   await loadData();
 });
 
@@ -1005,16 +1119,26 @@ document.querySelector("#reservaForm").addEventListener("submit", async (event) 
   const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
   submitBtn.disabled = true;
 
-  const { data: inserted, error } = await supabase.from('reserve').insert(reserve).select();
+  const query = editingReserveId
+    ? supabase.from('reserve').update(reserve).eq('id', editingReserveId).eq('user_id', user.id).select().single()
+    : supabase.from('reserve').insert(reserve).select().single();
+  const { data: saved, error } = await query;
   submitBtn.disabled = false;
 
   if (error) {
-    alert("Erro ao salvar reserva: " + error.message);
+    alert(`Erro ao ${editingReserveId ? "atualizar" : "salvar"} reserva: ` + error.message);
     return;
   }
 
-  event.currentTarget.reset();
-  initForms();
+  if (saved) {
+    const normalized = { ...saved, amount: Number(saved.amount) };
+    state.reserve = editingReserveId
+      ? state.reserve.map((item) => (item.id === normalized.id ? normalized : item))
+      : [...state.reserve, normalized];
+    render();
+  }
+
+  resetReserveForm();
   await loadData();
 });
 
@@ -1040,9 +1164,19 @@ document.querySelector("#driverForm").addEventListener("submit", async (event) =
     consumo_veiculo: normalizeAmount(document.querySelector("#driverConsumo").value || 0)
   };
 
-  const { error } = await supabase
-    .from("motorista_registros")
-    .insert(registro);
+  const { data: saved, error } = editingDriverId
+    ? await supabase
+        .from("motorista_registros")
+        .update(registro)
+        .eq("id", editingDriverId)
+        .eq("user_id", user.id)
+        .select()
+        .single()
+    : await supabase
+        .from("motorista_registros")
+        .insert(registro)
+        .select()
+        .single();
 
   submitButton.disabled = false;
 
@@ -1069,7 +1203,23 @@ document.querySelector("#driverForm").addEventListener("submit", async (event) =
     updateMonthLabels();
   }
 
+  if (saved) {
+    const normalized = {
+      ...saved,
+      uber: Number(saved.uber),
+      noventa_nove: Number(saved.noventa_nove),
+      quilometragem: Number(saved.quilometragem),
+      preco_gasolina: Number(saved.preco_gasolina),
+      consumo_veiculo: Number(saved.consumo_veiculo),
+    };
+    state.motorista = editingDriverId
+      ? state.motorista.map((item) => (item.id === normalized.id ? normalized : item))
+      : [...state.motorista, normalized];
+    render();
+  }
+
   event.currentTarget.reset();
+  resetDriverForm();
   await loadData();
 });
 
@@ -1103,6 +1253,91 @@ document.body.addEventListener("click", async (event) => {
     setBillFormMode(true);
     switchTab("contas");
     contaForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  const editEntryId = button.dataset.editEntry;
+  if (editEntryId) {
+    const entry = state.entries.find((item) => item.id === editEntryId);
+    if (!entry) return;
+
+    const lancamentoForm = document.querySelector("#lancamentoForm");
+    if (!lancamentoForm) return;
+
+    editingEntryId = entry.id;
+    lancamentoForm.querySelector('input[name="date"]').value = entry.date;
+    lancamentoForm.querySelector('select[name="type"]').value = entry.type;
+    lancamentoForm.querySelector('select[name="category"]').value = entry.category;
+    lancamentoForm.querySelector('input[name="description"]').value = entry.description;
+    lancamentoForm.querySelector('select[name="payment"]').value = entry.payment;
+    lancamentoForm.querySelector('input[name="amount"]').value = String(entry.amount);
+    lancamentoForm.querySelector('input[name="paid"]').checked = !!entry.paid;
+    lancamentoForm.querySelector('input[name="note"]').value = entry.note || "";
+
+    setEntryFormMode(true);
+    switchTab("lancamentos");
+    lancamentoForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  const editGoalId = button.dataset.editGoal;
+  if (editGoalId) {
+    const goal = state.goals.find((item) => item.id === editGoalId);
+    if (!goal) return;
+
+    const metaForm = document.querySelector("#metaForm");
+    if (!metaForm) return;
+
+    editingGoalId = goal.id;
+    metaForm.querySelector('input[name="name"]').value = goal.name;
+    metaForm.querySelector('input[name="target"]').value = String(goal.target);
+    metaForm.querySelector('input[name="saved"]').value = String(goal.saved);
+
+    setGoalFormMode(true);
+    switchTab("metas");
+    metaForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  const editReserveId = button.dataset.editReserve;
+  if (editReserveId) {
+    const item = state.reserve.find((entry) => entry.id === editReserveId);
+    if (!item) return;
+
+    const reservaForm = document.querySelector("#reservaForm");
+    if (!reservaForm) return;
+
+    editingReserveId = item.id;
+    reservaForm.querySelector('input[name="date"]').value = item.date;
+    reservaForm.querySelector('input[name="amount"]').value = String(item.amount);
+    reservaForm.querySelector('select[name="type"]').value = item.type;
+    reservaForm.querySelector('input[name="note"]').value = item.note || "";
+
+    setReserveFormMode(true);
+    switchTab("reserva");
+    reservaForm.scrollIntoView({ behavior: "smooth", block: "start" });
+    return;
+  }
+
+  const editDriverId = button.dataset.editDriver;
+  if (editDriverId) {
+    const registro = state.motorista.find((item) => item.id === editDriverId);
+    if (!registro) return;
+
+    const driverForm = document.querySelector("#driverForm");
+    if (!driverForm) return;
+
+    editingDriverId = registro.id;
+    document.querySelector("#driverData").value = registro.data;
+    document.querySelector("#driverUber").value = String(registro.uber);
+    document.querySelector("#driver99").value = String(registro.noventa_nove);
+    document.querySelector("#driverKm").value = String(registro.quilometragem);
+    document.querySelector("#driverGasolina").value = String(registro.preco_gasolina);
+    document.querySelector("#driverConsumo").value = String(registro.consumo_veiculo);
+
+    setDriverFormMode(true);
+    switchTab("motorista");
+    driverForm.scrollIntoView({ behavior: "smooth", block: "start" });
     return;
   }
 
@@ -1186,6 +1421,18 @@ document.body.addEventListener("click", async (event) => {
       if (!error) {
         if (map.key === "deleteBill" && id === editingBillId) {
           resetBillForm();
+        }
+        if (map.key === "deleteEntry" && id === editingEntryId) {
+          resetEntryForm();
+        }
+        if (map.key === "deleteGoal" && id === editingGoalId) {
+          resetGoalForm();
+        }
+        if (map.key === "deleteReserve" && id === editingReserveId) {
+          resetReserveForm();
+        }
+        if (map.key === "deleteDriver" && id === editingDriverId) {
+          resetDriverForm();
         }
         state[map.stateKey] = state[map.stateKey].filter((item) => item.id !== id);
         render();
