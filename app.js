@@ -1865,45 +1865,8 @@ navTabsArray.forEach((tab) => {
   });
 });
 
-// PWA Installation Logic
-let deferredPrompt;
-const installAppBtn = document.querySelector("#installAppBtn");
-
-function isIosDevice() {
-  const userAgent = window.navigator.userAgent.toLowerCase();
-  return /iphone|ipad|ipod/.test(userAgent);
-}
-
-function isInStandaloneMode() {
-  return ('standalone' in window.navigator) && (window.navigator.standalone);
-}
-
-window.addEventListener("beforeinstallprompt", (e) => {
-  e.preventDefault();
-  deferredPrompt = e;
-  if (installAppBtn) installAppBtn.classList.remove("hidden");
-});
-
-if (installAppBtn) {
-  installAppBtn.addEventListener("click", async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') {
-        deferredPrompt = null;
-        installAppBtn.classList.add("hidden");
-      }
-    } else if (isIosDevice() && !isInStandaloneMode()) {
-      showToast("No Safari, toque no ícone de compartilhar e depois em 'Adicionar à Tela de Início'.", "info");
-    }
-  });
-
-  // Mostra o botão para iOS mesmo sem beforeinstallprompt, caso não esteja instalado
-  if (isIosDevice() && !isInStandaloneMode()) {
-    installAppBtn.classList.remove("hidden");
-  }
-}
 
 initForms();
 initBillsSortingControls();
+updateInstallButtonVisibility();
 render();
