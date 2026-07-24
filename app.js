@@ -975,7 +975,7 @@ const onInstallClick = async () => {
   }
 
   if (isIosDevice() && !isInStandaloneMode()) {
-    alert("No iPhone/iPad: toque em Compartilhar no Safari e escolha 'Adicionar à Tela de Início'.");
+    showToast("No Safari: toque em ↗ Compartilhar → 'Adicionar à Tela de Início'.", "info");
   }
 };
 
@@ -1819,9 +1819,10 @@ document.querySelector("#driverGasolina")?.addEventListener("input", updateDrive
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch((error) => {
-      console.error("Falha ao registrar service worker:", error);
-    });
+    navigator.serviceWorker
+      .register("/sw.js")
+      .then((reg) => console.log("[SW] Registrado com sucesso:", reg.scope))
+      .catch((error) => console.error("[SW] Falha ao registrar:", error));
   });
 }
 
