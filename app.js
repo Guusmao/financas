@@ -1825,7 +1825,85 @@ if ("serviceWorker" in navigator) {
   });
 }
 
+// Menu Drawer Logic
+const drawerMenu = document.getElementById("drawer-menu");
+const drawerBackdrop = document.getElementById("drawer-backdrop");
+const menuToggle = document.getElementById("menu-toggle");
+const menuClose = document.getElementById("menu-close");
+const appShell = document.querySelector(".app-shell");
+
+function toggleDrawer() {
+  if (!drawerMenu) return;
+  const isOpen = drawerMenu.classList.contains("open");
+  if (isOpen) {
+    drawerMenu.classList.remove("open");
+    if(drawerBackdrop) drawerBackdrop.classList.add("hidden");
+    if(menuToggle) menuToggle.setAttribute("aria-expanded", "false");
+  } else {
+    drawerMenu.classList.add("open");
+    if(drawerBackdrop) drawerBackdrop.classList.remove("hidden");
+    if(menuToggle) menuToggle.setAttribute("aria-expanded", "true");
+  }
+}
+
+if (menuToggle) menuToggle.addEventListener("click", toggleDrawer);
+if (menuClose) menuClose.addEventListener("click", toggleDrawer);
+if (drawerBackdrop) drawerBackdrop.addEventListener("click", toggleDrawer);
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && drawerMenu && drawerMenu.classList.contains("open")) {
+    toggleDrawer();
+  }
+});
+
+const navTabsArray = document.querySelectorAll(".nav-tab");
+navTabsArray.forEach((tab) => {
+  tab.addEventListener("click", () => {
+    if (drawerMenu && drawerMenu.classList.contains("open")) {
+      toggleDrawer();
+    }
+  });
+});
+
+// PWA Installation Logic
+let deferredPrompt;
+const installAppBtn = document.querySelector("#installAppBtn");
+
+function isIosDevice() {
+  const userAgent = window.navigator.userAgent.toLowerCase();
+  return /iphone|ipad|ipod/.test(userAgent);
+}
+
+function isInStandaloneMode() {
+  return ('standalone' in window.navigator) && (window.navigator.standalone);
+}
+
+window.addEventListener("beforeinstallprompt", (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  if (installAppBtn) installAppBtn.classList.remove("hidden");
+});
+
+if (installAppBtn) {
+  installAppBtn.addEventListener("click", async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        deferredPrompt = null;
+        installAppBtn.classList.add("hidden");
+      }
+    } else if (isIosDevice() && !isInStandaloneMode()) {
+      showToast("No Safari, toque no ícone de compartilhar e depois em 'Adicionar à Tela de Início'.", "info");
+    }
+  });
+
+  // Mostra o botão para iOS mesmo sem beforeinstallprompt, caso não esteja instalado
+  if (isIosDevice() && !isInStandaloneMode()) {
+    installAppBtn.classList.remove("hidden");
+  }
+}
+
 initForms();
 initBillsSortingControls();
-updateInstallButtonVisibility();
 render();

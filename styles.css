@@ -32,18 +32,88 @@ select {
 }
 
 .app-shell {
-  display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
 }
 
-.sidebar {
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: 60px;
+  padding: 0 16px;
+  background: linear-gradient(180deg, #3f6f9f 0%, #294962 100%);
+  color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+#menu-toggle {
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 4px;
+}
+
+.topbar-brand h1 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.drawer {
   display: flex;
   flex-direction: column;
   gap: 28px;
   padding: 24px 18px;
   color: #fff;
   background: linear-gradient(180deg, #3f6f9f 0%, #294962 100%);
+  position: fixed;
+  top: 0;
+  left: -280px;
+  width: 280px;
+  height: 100vh;
+  z-index: 1000;
+  transition: transform 0.3s ease;
+  overflow-y: auto;
+}
+
+.drawer.open {
+  transform: translateX(280px);
+}
+
+.drawer-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.drawer-backdrop.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+#menu-close {
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
 }
 
 .brand {
@@ -653,28 +723,19 @@ td {
 }
 
 @media (max-width: 980px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-  }
-
   .month-pill {
     position: relative;
     z-index: 10;
   }
 
-
-  .sidebar {
-    position: sticky;
-    top: 0;
-    z-index: 4;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 14px;
+  .nav-tabs {
+    flex-direction: column;
+    padding-bottom: 24px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
   }
 
-  .nav-tabs {
-    grid-template-columns: repeat(5, minmax(112px, 1fr));
-    overflow-x: auto;
+  .nav-tab {
+    height: 48px;
   }
 
   .summary-grid,
