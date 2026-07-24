@@ -63,6 +63,39 @@ function money(value) {
   return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function showToast(message, type = "success") {
+  const container = document.querySelector("#toast-container");
+  if (!container) return;
+  const toast = document.createElement("div");
+  toast.className = `toast ${type}`;
+  toast.innerHTML = message;
+  container.appendChild(toast);
+  setTimeout(() => toast.remove(), 3000);
+}
+
+function showModal(title, desc, confirmCallback, cancelCallback = null) {
+  const modal = document.querySelector("#custom-modal");
+  if (!modal) return;
+  modal.querySelector("#modal-title").textContent = title;
+  modal.querySelector("#modal-desc").textContent = desc;
+  const confirmBtn = modal.querySelector("#modal-confirm");
+  const cancelBtn = modal.querySelector("#modal-cancel");
+
+  const close = () => modal.classList.add("hidden");
+
+  confirmBtn.onclick = async () => {
+    close();
+    if (confirmCallback) await confirmCallback();
+  };
+  cancelBtn.onclick = () => {
+    close();
+    if (cancelCallback) cancelCallback();
+  };
+
+  modal.classList.remove("hidden");
+}
+
+
 function dateLabel(date) {
   if (!date) return "";
   return new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR");
@@ -421,6 +454,7 @@ function resetEntryForm() {
   initForms();
 }
 
+
 function setGoalFormMode(isEditing) {
   const submitBtn = document.querySelector("#metaForm button[type=\"submit\"]");
   if (submitBtn) {
@@ -604,17 +638,29 @@ function renderEntries() {
   const lancamentosTable = document.querySelector("#lancamentosTable");
   if (!lancamentosTable) return;
 
-  // Filtra lançamentos exibidos na tabela de lançamentos por mês ativo
-  const rows = state.entries
+  const monthEntries = state.entries
     .filter((entry) => entry.date.startsWith(selectedMonth))
-    .filter((entry) => !String(entry.note || "").toLowerCase().includes("conta fixa"))
+    .filter((entry) => !String(entry.note || "").toLowerCase().includes("conta fixa"));
+
+  const sumEntrada = monthEntries.filter(e => e.type === "Entrada").reduce((a,b) => a + toFiniteNumber(b.amount), 0);
+  const sumSaida = monthEntries.filter(e => e.type === "Saída").reduce((a,b) => a + toFiniteNumber(b.amount), 0);
+  const sumEssencial = monthEntries.filter(e => e.is_essential).reduce((a,b) => a + toFiniteNumber(b.amount), 0);
+
+  const lte = document.querySelector("#lancamentosTotalEntrada");
+  if(lte) lte.textContent = money(sumEntrada);
+  const lts = document.querySelector("#lancamentosTotalSaida");
+  if(lts) lts.textContent = money(sumSaida);
+  const ltes = document.querySelector("#lancamentosTotalEssencial");
+  if(ltes) ltes.textContent = money(sumEssencial);
+
+  const rows = monthEntries
     .slice()
     .sort((a, b) => b.date.localeCompare(a.date))
     .map((entry) => `<tr>
     <td>${dateLabel(entry.date)}</td>
-    <td>${escapeHtml(entry.type)}</td>
+    <td><span class="badge ${entry.type}">${escapeHtml(entry.type)}</span></td>
     <td>${escapeHtml(entry.category)}</td>
-    <td>${escapeHtml(entry.description)}</td>
+    <td>${escapeHtml(entry.description)} ${entry.is_essential ? '<span class="badge essential">Essencial</span>' : ''}</td>
     <td>${escapeHtml(entry.payment)}</td>
     <td>${money(entry.amount)}</td>
     <td>${entry.paid ? "☑" : "☐"}</td>
@@ -954,11 +1000,14 @@ authForm.addEventListener("submit", async (event) => {
 });
 
 logoutBtn.addEventListener("click", async () => {
-  if (supabase && confirm("Tem certeza que deseja sair?")) {
-    await supabase.auth.signOut();
-    await checkAuth();
+  if (supabase) {
+    showModal("Sair da conta", "Tem certeza que deseja sair?", async () => {
+      await supabase.auth.signOut();
+      await checkAuth();
+    });
   }
 });
+
 
 // Form Submissions
 const lancamentoForm = document.querySelector("#lancamentoForm");
@@ -982,6 +1031,7 @@ if (lancamentoForm) {
       payment,
       amount: normalizeAmount(data.amount),
       paid: event.currentTarget.paid.checked,
+      is_essential: event.currentTarget.isEssential?.checked || false,
       note: existingEntry ? (existingEntry.note || "") : "",
     };
     
@@ -995,9 +1045,10 @@ if (lancamentoForm) {
     submitBtn.disabled = false;
 
     if (error) {
-      alert(`Erro ao ${editingEntryId ? "atualizar" : "salvar"} lançamento: ` + error.message);
+      showToast(`Erro ao ${editingEntryId ? "atualizar" : "salvar"} lançamento: ` + error.message, "error");
       return;
     }
+
 
     if (saved) {
       const normalized = { ...saved, amount: Number(saved.amount) };
@@ -1273,6 +1324,10 @@ document.body.addEventListener("click", async (event) => {
     lancamentoForm.querySelector('select[name="payment"]').value = entry.payment;
     lancamentoForm.querySelector('input[name="amount"]').value = String(entry.amount);
     lancamentoForm.querySelector('input[name="paid"]').checked = !!entry.paid;
+    if (lancamentoForm.querySelector('input[name="isEssential"]')) {
+      lancamentoForm.querySelector('input[name="isEssential"]').checked = !!entry.is_essential;
+    }
+
 
     setEntryFormMode(true);
     switchTab("lancamentos");
@@ -1415,31 +1470,23 @@ document.body.addEventListener("click", async (event) => {
   for (const map of maps) {
     const id = button.dataset[map.key];
     if (id) {
-      if (!confirm("Tem certeza que deseja excluir este item?")) return;
-      button.disabled = true;
-      const { error } = await supabase.from(map.table).delete().eq('id', id);
-      if (!error) {
-        if (map.key === "deleteBill" && id === editingBillId) {
-          resetBillForm();
+      showModal("Confirmar exclusão", "Tem certeza que deseja excluir este item?", async () => {
+        button.disabled = true;
+        const { error } = await supabase.from(map.table).delete().eq('id', id);
+        if (!error) {
+          if (map.key === "deleteBill" && id === editingBillId) resetBillForm();
+          if (map.key === "deleteEntry" && id === editingEntryId) resetEntryForm();
+          if (map.key === "deleteGoal" && id === editingGoalId) resetGoalForm();
+          if (map.key === "deleteReserve" && id === editingReserveId) resetReserveForm();
+          if (map.key === "deleteDriver" && id === editingDriverId) resetDriverForm();
+          state[map.stateKey] = state[map.stateKey].filter((item) => item.id !== id);
+          render();
+          showToast("Item excluído com sucesso!");
+        } else {
+          showToast("Erro ao excluir: " + error.message, "error");
+          button.disabled = false;
         }
-        if (map.key === "deleteEntry" && id === editingEntryId) {
-          resetEntryForm();
-        }
-        if (map.key === "deleteGoal" && id === editingGoalId) {
-          resetGoalForm();
-        }
-        if (map.key === "deleteReserve" && id === editingReserveId) {
-          resetReserveForm();
-        }
-        if (map.key === "deleteDriver" && id === editingDriverId) {
-          resetDriverForm();
-        }
-        state[map.stateKey] = state[map.stateKey].filter((item) => item.id !== id);
-        render();
-      } else {
-        alert("Erro ao excluir: " + error.message);
-        button.disabled = false;
-      }
+      });
     }
   }
 });
@@ -1454,6 +1501,30 @@ document.querySelector("#exportData").addEventListener("click", () => {
   link.download = "financas-dados.json";
   link.click();
   URL.revokeObjectURL(url);
+  showToast("Dados exportados com sucesso!");
+});
+
+document.querySelector("#exportPDF")?.addEventListener("click", () => {
+  if (typeof window.jspdf === "undefined") {
+    showToast("Biblioteca jsPDF não carregada.", "error");
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  const title = `Resumo Financeiro - ${selectedMonth}`;
+  doc.setFontSize(18);
+  doc.text(title, 14, 22);
+
+  doc.setFontSize(12);
+  const t = totals();
+  doc.text(`Entradas: ${money(t.entradas)}`, 14, 32);
+  doc.text(`Saídas: ${money(t.saidas)}`, 14, 40);
+  doc.text(`Reserva (Mês): ${money(t.reservaMes)}`, 14, 48);
+  doc.text(`Saldo: ${money(t.saldo)}`, 14, 56);
+
+  doc.save(`financas_${selectedMonth}.pdf`);
+  showToast("PDF gerado com sucesso!");
 });
 
 document.querySelector("#importData").addEventListener("change", async (event) => {
@@ -1461,7 +1532,8 @@ document.querySelector("#importData").addEventListener("change", async (event) =
   if (!file || !supabase || !user) return;
   try {
     const imported = JSON.parse(await file.text());
-    if (!confirm("A importação substituirá todos os seus dados atuais no banco. Deseja continuar?")) return;
+    showModal("Importar Dados", "A importação substituirá todos os seus dados atuais no banco. Deseja continuar?", async () => {
+      try {
 
     // Clear existing
     await Promise.all([
@@ -1520,27 +1592,36 @@ document.querySelector("#importData").addEventListener("change", async (event) =
       consumo_veiculo: Number(m.consumo_veiculo)
     }));
 
-    await Promise.all([
-      entries.length > 0 ? supabase.from('entries').insert(entries) : Promise.resolve(),
-      bills.length > 0 ? supabase.from('bills').insert(bills) : Promise.resolve(),
-      goals.length > 0 ? supabase.from('goals').insert(goals) : Promise.resolve(),
-      reserve.length > 0 ? supabase.from('reserve').insert(reserve) : Promise.resolve(),
-      motorista.length > 0 ? supabase.from('motorista_registros').insert(motorista) : Promise.resolve()
-    ]);
+        await Promise.all([
+          entries.length > 0 ? supabase.from('entries').insert(entries) : Promise.resolve(),
+          bills.length > 0 ? supabase.from('bills').insert(bills) : Promise.resolve(),
+          goals.length > 0 ? supabase.from('goals').insert(goals) : Promise.resolve(),
+          reserve.length > 0 ? supabase.from('reserve').insert(reserve) : Promise.resolve(),
+          motorista.length > 0 ? supabase.from('motorista_registros').insert(motorista) : Promise.resolve()
+        ]);
 
-    await loadData();
-    event.target.value = "";
+        await loadData();
+        showToast("Dados importados com sucesso!");
+      } catch (err) {
+        console.error(err);
+        showToast("Erro ao importar dados. Verifique o console.", "error");
+      }
+      event.target.value = "";
+    }, () => {
+      event.target.value = "";
+    });
   } catch (err) {
     console.error(err);
-    alert("Erro ao importar dados. Verifique o console.");
+    showToast("Erro ao ler arquivo JSON.", "error");
+    event.target.value = "";
   }
 });
 
 document.querySelector("#resetData").addEventListener("click", async () => {
   if (!supabase || !user) return;
-  if (!confirm("Tem certeza que deseja apagar todos os dados e restaurar o exemplo?")) return;
-  try {
-    // Delete all entries for current user in Supabase
+  showModal("Restaurar Exemplo", "Tem certeza que deseja apagar todos os dados e restaurar o exemplo?", async () => {
+    try {
+      // Delete all entries for current user in Supabase
     await Promise.all([
       supabase.from('entries').delete().eq('user_id', user.id),
       supabase.from('bills').delete().eq('user_id', user.id),
@@ -1579,17 +1660,19 @@ document.querySelector("#resetData").addEventListener("click", async () => {
       saved: g.saved
     }));
 
-    await Promise.all([
-      entries.length > 0 ? supabase.from('entries').insert(entries) : Promise.resolve(),
-      bills.length > 0 ? supabase.from('bills').insert(bills) : Promise.resolve(),
-      goals.length > 0 ? supabase.from('goals').insert(goals) : Promise.resolve()
-    ]);
+      await Promise.all([
+        entries.length > 0 ? supabase.from('entries').insert(entries) : Promise.resolve(),
+        bills.length > 0 ? supabase.from('bills').insert(bills) : Promise.resolve(),
+        goals.length > 0 ? supabase.from('goals').insert(goals) : Promise.resolve()
+      ]);
 
-    await loadData();
-  } catch (err) {
-    console.error(err);
-    alert("Erro ao restaurar exemplo.");
-  }
+      await loadData();
+      showToast("Banco restaurado com os dados de exemplo.");
+    } catch (err) {
+      console.error(err);
+      showToast("Erro ao restaurar exemplo.", "error");
+    }
+  });
 });
 
 // App Initialization
@@ -1598,10 +1681,8 @@ if (isConfigured) {
     checkAuth();
   });
   
-  // Executar checkAuth na inicialização
   checkAuth();
 }
-
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch((error) => {

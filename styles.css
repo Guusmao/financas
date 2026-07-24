@@ -110,45 +110,55 @@ select {
   margin-top: auto;
 }
 
-.icon-button {
-  display: grid;
-  width: 40px;
+.sidebar-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   height: 40px;
-  place-items: center;
+  padding: 0 10px;
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 6px;
   color: #fff;
   background: rgba(255, 255, 255, 0.1);
   cursor: pointer;
+  flex: 1;
+  min-width: 40px;
 }
 
-.icon-button.danger {
+.sidebar-action span {
+  display: none;
+  font-size: 14px;
+}
+
+@media (min-width: 1024px) {
+  .sidebar-action {
+    justify-content: flex-start;
+    padding: 0 14px;
+  }
+  .sidebar-action span {
+    display: inline;
+  }
+}
+
+.sidebar-action:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.sidebar-action.danger {
   color: #ffe5e5;
 }
 
-.icon-button.install {
+.sidebar-action.install {
   color: #e7fff0;
   border-color: rgba(140, 235, 182, 0.7);
   background: rgba(34, 121, 78, 0.55);
 }
 
-.icon-button.install:hover {
+.sidebar-action.install:hover {
   background: rgba(34, 121, 78, 0.82);
 }
 
-.install-app-button {
-  width: 100%;
-  min-height: 38px;
-  border: 1px solid rgba(140, 235, 182, 0.7);
-  border-radius: 6px;
-  color: #e7fff0;
-  background: rgba(34, 121, 78, 0.55);
-  cursor: pointer;
-}
-
-.install-app-button:hover {
-  background: rgba(34, 121, 78, 0.82);
-}
 
 .main {
   min-width: 0;
@@ -213,6 +223,7 @@ select {
   -webkit-appearance: none;
   -moz-appearance: none;
   appearance: none;
+  min-height: 44px;
 }
 
 .summary-grid {
@@ -645,6 +656,12 @@ td {
   .app-shell {
     grid-template-columns: 1fr;
   }
+
+  .month-pill {
+    position: relative;
+    z-index: 10;
+  }
+
 
   .sidebar {
     position: sticky;
