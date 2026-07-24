@@ -5,7 +5,7 @@ import {
 import { createClient } from '@supabase/supabase-js';
 
 const config = {
-  categories: ["Salário", "Mercado", "Internet", "Moradia", "Educação", "Transporte", "Faculdade", "Seguro", "TIM", "Lazer", "Saúde", "Reserva", "Outros"],
+  categories: ["Salário", "Mercado", "Internet", "Moradia", "Educação", "Transporte", "Faculdade", "Seguro", "TIM", "Lazer", "Saúde", "Reserva", "Abastecimento", "Outros"],
   payments: ["PIX", "Débito", "Crédito", "Dinheiro", "Transferência"],
 };
 
@@ -62,6 +62,43 @@ let billsSortDirection = "asc";
 function money(value) {
   return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
+
+function updateDriverEstimates() {
+  const km = normalizeAmount(document.querySelector("#driverKm")?.value || 0);
+  const consumo = normalizeAmount(document.querySelector("#driverConsumo")?.value || 0);
+  const gasolina = normalizeAmount(document.querySelector("#driverGasolina")?.value || 0);
+  
+  const est = document.querySelector("#driverEstimativaCusto");
+  const info = document.querySelector("#driverTanqueInfo");
+  if (!est || !info) return;
+
+  const openTank = state.entries.find(e => e.type === "Saída" && e.category === "Abastecimento" && !e.fuel_closed);
+  
+  if (openTank) {
+    info.textContent = `Valor disponível no tanque: ${money(openTank.fuel_value_remaining)}`;
+    info.style.color = "#1e5d8f";
+    
+    if (km && consumo && gasolina && consumo > 0) {
+      const custo = (km / consumo) * gasolina;
+      const rest = openTank.fuel_value_remaining - custo;
+      if (rest < 0) {
+        est.textContent = `Custo estimado desta corrida: ${money(custo)} — tanque não será suficiente!`;
+        est.style.color = "#8f1f1f";
+      } else {
+        est.textContent = `Custo estimado desta corrida: ${money(custo)} — vai restar ${money(rest)} no tanque`;
+        est.style.color = "#1e5d8f";
+      }
+      est.style.display = "block";
+    } else {
+      est.style.display = "none";
+    }
+  } else {
+    info.textContent = "Nenhum abastecimento em aberto — lance um abastecimento em Outras Movimentações antes de registrar corridas.";
+    info.style.color = "#8f1f1f";
+    est.style.display = "none";
+  }
+}
+
 
 function showToast(message, type = "success") {
   const container = document.querySelector("#toast-container");
@@ -728,6 +765,7 @@ function render() {
   renderGoals();
   renderReserve();
   renderMotorista(state.motorista, selectedMonth, money, dateLabel);
+  updateDriverEstimates();
 }
 
 function formData(form) {
@@ -758,7 +796,12 @@ async function loadData() {
     if (reserveRes.error) throw reserveRes.error;
     if (motoristaRes.error) throw motoristaRes.error;
 
-    state.entries = (entriesRes.data || []).map(e => ({ ...e, amount: Number(e.amount) }));
+    state.entries = (entriesRes.data || []).map(e => ({ 
+      ...e, 
+      amount: Number(e.amount),
+      fuel_value_remaining: Number(e.fuel_value_remaining || 0),
+      fuel_closed: !!e.fuel_closed
+    }));
     state.bills = (billsRes.data || []).map(b => ({
       id: b.id,
       name: b.name,
@@ -1022,6 +1065,7 @@ if (lancamentoForm) {
     const category = config.categories.includes(data.category) ? data.category : "Outros";
     const payment = config.payments.includes(data.payment) ? data.payment : "PIX";
     const existingEntry = editingEntryId ? state.entries.find((item) => item.id === editingEntryId) : null;
+    const isAbastecimento = category === "Abastecimento";
     const entry = {
       user_id: user.id,
       date: data.date,
@@ -1033,10 +1077,67 @@ if (lancamentoForm) {
       paid: event.currentTarget.paid.checked,
       is_essential: event.currentTarget.isEssential?.checked || false,
       note: existingEntry ? (existingEntry.note || "") : "",
+      fuel_value_remaining: (isAbastecimento && !editingEntryId) ? normalizeAmount(data.amount) : (existingEntry ? existingEntry.fuel_value_remaining : null),
+      fuel_closed: existingEntry ? existingEntry.fuel_closed : false,
     };
     
     const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
+
+    if (isAbastecimento && !editingEntryId) {
+      const openTank = state.entries.find(e => e.type === "Saída" && e.category === "Abastecimento" && !e.fuel_closed);
+      if (openTank && openTank.fuel_value_remaining > 0) {
+        const modal = document.querySelector("#fuel-modal");
+        modal.querySelector("#fuel-modal-remaining").textContent = money(openTank.fuel_value_remaining);
+        modal.querySelector("#fuel-modal-date").textContent = `Do abastecimento de ${dateLabel(openTank.date)}`;
+        
+        const form = document.querySelector("#fuel-modal-form");
+        form.querySelector("#fuel-modal-date-input").value = todayIso();
+        form.querySelector("#fuel-modal-desc-input").value = `Uso pessoal - sobra do abastecimento de ${dateLabel(openTank.date)}`;
+        form.querySelector("#fuel-modal-val-input").value = String(openTank.fuel_value_remaining);
+        
+        modal.classList.remove("hidden");
+        
+        document.querySelector("#fuel-modal-cancel").onclick = () => {
+          modal.classList.add("hidden");
+          submitBtn.disabled = false;
+        };
+        
+        form.onsubmit = async (e) => {
+          e.preventDefault();
+          modal.classList.add("hidden");
+          const usoPessoalData = {
+            user_id: user.id,
+            date: form.querySelector("#fuel-modal-date-input").value,
+            type: "Saída",
+            category: "Abastecimento",
+            description: form.querySelector("#fuel-modal-desc-input").value,
+            payment: "PIX",
+            amount: normalizeAmount(form.querySelector("#fuel-modal-val-input").value),
+            paid: true,
+            is_essential: false,
+            note: ""
+          };
+          
+          await supabase.from('entries').insert(usoPessoalData);
+          await supabase.from('entries').update({ fuel_closed: true }).eq('id', openTank.id);
+          
+          showToast(`Gasto de uso pessoal de ${money(usoPessoalData.amount)} lançado.`, "info");
+          
+          const { data: saved, error } = await supabase.from('entries').insert(entry).select().single();
+          submitBtn.disabled = false;
+          if (error) {
+            showToast("Erro ao salvar abastecimento: " + error.message, "error");
+            return;
+          }
+          await loadData();
+          resetEntryForm();
+        };
+        return; 
+      } else if (openTank) {
+        await supabase.from('entries').update({ fuel_closed: true }).eq('id', openTank.id);
+      }
+    }
 
     const query = editingEntryId
       ? supabase.from('entries').update(entry).eq('id', editingEntryId).eq('user_id', user.id).select().single()
@@ -1216,6 +1317,10 @@ document.querySelector("#driverForm").addEventListener("submit", async (event) =
     consumo_veiculo: normalizeAmount(document.querySelector("#driverConsumo").value || 0)
   };
 
+  const custo = (registro.quilometragem > 0 && registro.consumo_veiculo > 0) 
+    ? (registro.quilometragem / registro.consumo_veiculo) * registro.preco_gasolina 
+    : 0;
+
   const { data: saved, error } = editingDriverId
     ? await supabase
         .from("motorista_registros")
@@ -1229,6 +1334,24 @@ document.querySelector("#driverForm").addEventListener("submit", async (event) =
         .insert(registro)
         .select()
         .single();
+
+  if (!error && !editingDriverId) {
+    const openTank = state.entries.find(e => e.type === "Saída" && e.category === "Abastecimento" && !e.fuel_closed);
+    if (openTank && custo > 0) {
+      const newRemaining = Math.max(0, openTank.fuel_value_remaining - custo);
+      const closed = newRemaining === 0;
+      const { error: tankError } = await supabase.from('entries').update({
+        fuel_value_remaining: newRemaining,
+        fuel_closed: closed
+      }).eq('id', openTank.id);
+      
+      if (!tankError) {
+        openTank.fuel_value_remaining = newRemaining;
+        openTank.fuel_closed = closed;
+        if (closed) showToast("O combustível do tanque acabou!", "info");
+      }
+    }
+  }
 
   submitButton.disabled = false;
 
@@ -1554,7 +1677,10 @@ document.querySelector("#importData").addEventListener("change", async (event) =
       payment: e.payment,
       amount: Number(e.amount),
       paid: e.paid,
-      note: e.note
+      note: e.note,
+      is_essential: e.is_essential,
+      fuel_value_remaining: Number(e.fuelValueRemaining || e.fuel_value_remaining || 0),
+      fuel_closed: !!(e.fuelClosed || e.fuel_closed)
     }));
 
     const bills = (imported.bills || []).map(b => ({
@@ -1640,7 +1766,10 @@ document.querySelector("#resetData").addEventListener("click", async () => {
       payment: e.payment,
       amount: e.amount,
       paid: e.paid,
-      note: e.note
+      note: e.note,
+      is_essential: e.is_essential,
+      fuel_value_remaining: e.fuel_value_remaining || 0,
+      fuel_closed: !!e.fuel_closed
     }));
 
     const bills = seed.bills.map(b => ({
@@ -1683,6 +1812,11 @@ if (isConfigured) {
   
   checkAuth();
 }
+
+document.querySelector("#driverKm")?.addEventListener("input", updateDriverEstimates);
+document.querySelector("#driverConsumo")?.addEventListener("input", updateDriverEstimates);
+document.querySelector("#driverGasolina")?.addEventListener("input", updateDriverEstimates);
+
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("/sw.js").catch((error) => {

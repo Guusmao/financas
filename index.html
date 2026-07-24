@@ -374,6 +374,7 @@
     <div>
 
       <h2>Motorista de Aplicativo</h2>
+      <p id="driverTanqueInfo" style="margin-top: 8px; font-weight: bold; color: #1e5d8f;"></p>
 
       <p>
         Controle diário de ganhos, combustível e desempenho.
@@ -488,9 +489,12 @@
 
       </div>
 
+      <p id="driverEstimativaCusto" style="margin-top: 12px; font-size: 14px; font-weight: bold; color: #1e5d8f; display: none;"></p>
+
       <button
         type="submit"
-        class="primary">
+        class="primary"
+        style="margin-top: 16px;">
 
         Salvar Registro
 
@@ -596,6 +600,32 @@
         </div>
       </div>
     </div>
+    <!-- Modal de Sobra de Combustível -->
+    <div id="fuel-modal" class="modal hidden">
+      <div class="modal-card">
+        <h3>Sobrou combustível!</h3>
+        <p>Parece que você está registrando um novo abastecimento, mas ainda há saldo no tanque atual.</p>
+        <div style="background: #e6f0fa; padding: 12px; border-radius: 6px; margin-bottom: 16px;">
+          <strong>Saldo restante (Uso Pessoal): </strong>
+          <span id="fuel-modal-remaining" style="font-size: 18px; color: #1e5d8f; font-weight: bold;">R$ 0,00</span>
+          <br>
+          <small id="fuel-modal-date" style="color: #667085;">Do abastecimento de --/--/----</small>
+        </div>
+        <form id="fuel-modal-form" class="entry-form-modern">
+          <label style="font-size: 14px; font-weight: bold;">Data do uso pessoal:</label>
+          <input type="date" id="fuel-modal-date-input" required />
+          <label style="font-size: 14px; font-weight: bold;">Descrição do gasto:</label>
+          <input id="fuel-modal-desc-input" required />
+          <label style="font-size: 14px; font-weight: bold;">Valor (R$):</label>
+          <input type="text" id="fuel-modal-val-input" inputmode="decimal" required />
+          <div class="modal-actions" style="margin-top: 16px;">
+            <button id="fuel-modal-cancel" class="row-action neutral" type="button">Cancelar</button>
+            <button type="submit" class="row-action">Confirmar e lançar gasto</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <div id="toast-container" class="toast-container"></div>
 
     <script src="config.js"></script>
