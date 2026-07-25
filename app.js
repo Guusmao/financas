@@ -1077,9 +1077,15 @@ if (lancamentoForm) {
       paid: event.currentTarget.paid.checked,
       is_essential: event.currentTarget.isEssential?.checked || false,
       note: existingEntry ? (existingEntry.note || "") : "",
-      fuel_value_remaining: (isAbastecimento && !editingEntryId) ? normalizeAmount(data.amount) : (existingEntry ? existingEntry.fuel_value_remaining : null),
-      fuel_closed: existingEntry ? existingEntry.fuel_closed : false,
     };
+
+    // Só envia essas colunas quando fazem sentido, para não quebrar o insert
+    // caso a migration supabase/migrations/add_fuel_columns.sql ainda não
+    // tenha sido executada no banco (essas colunas precisam existir na tabela "entries").
+    if (isAbastecimento || existingEntry) {
+      entry.fuel_value_remaining = (isAbastecimento && !editingEntryId) ? normalizeAmount(data.amount) : (existingEntry ? existingEntry.fuel_value_remaining : null);
+      entry.fuel_closed = existingEntry ? existingEntry.fuel_closed : false;
+    }
     
     const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
     submitBtn.disabled = true;

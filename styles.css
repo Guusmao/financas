@@ -632,6 +632,30 @@ select {
   align-items: end;
 }
 
+.entry-form-modern .form-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.entry-form-modern .form-grid input,
+.entry-form-modern .form-grid select {
+  width: 100%;
+}
+
+.entry-form-modern .form-actions {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-top: 12px;
+}
+
+.entry-form-modern .form-actions .primary {
+  margin-left: auto;
+  padding: 0 18px;
+  white-space: nowrap;
+}
+
 .driver-form .form-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(140px, 1fr));
