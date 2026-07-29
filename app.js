@@ -1661,18 +1661,6 @@ document.body.addEventListener("click", async (event) => {
 });
 
 // Data Export / Import / Reset
-document.querySelector("#exportData").addEventListener("click", () => {
-  const exportState = { ...state };
-  const blob = new Blob([JSON.stringify(exportState, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = "financas-dados.json";
-  link.click();
-  URL.revokeObjectURL(url);
-  showToast("Dados exportados com sucesso!");
-});
-
 document.querySelector("#exportPDF")?.addEventListener("click", () => {
   if (typeof window.jspdf === "undefined") {
     showToast("Biblioteca jsPDF não carregada.", "error");
@@ -1680,172 +1668,161 @@ document.querySelector("#exportPDF")?.addEventListener("click", () => {
   }
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const monthLabel = new Date(`${selectedMonth}-01T00:00:00`).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const brand = [18, 48, 71];
+  const light = [244, 247, 250];
 
-  const title = `Resumo Financeiro - ${selectedMonth}`;
-  doc.setFontSize(18);
-  doc.text(title, 14, 22);
+  const addSectionTitle = (text, y) => {
+    doc.setFontSize(13);
+    doc.setTextColor(...brand);
+    doc.setFont(undefined, "bold");
+    doc.text(text, 14, y);
+    doc.setFont(undefined, "normal");
+    return y;
+  };
 
-  doc.setFontSize(12);
+  const tableEndY = () => doc.lastAutoTable ? doc.lastAutoTable.finalY : 60;
+
+  // Cabeçalho
+  doc.setFontSize(19);
+  doc.setTextColor(...brand);
+  doc.setFont(undefined, "bold");
+  doc.text("Relatório Financeiro", 14, 20);
+  doc.setFont(undefined, "normal");
+  doc.setFontSize(11);
+  doc.setTextColor(90, 90, 90);
+  doc.text(`Período de referência: ${monthLabel}`, 14, 28);
+  doc.text(`Gerado em: ${new Date().toLocaleString("pt-BR")}`, 14, 34);
+
+  // Resumo do mês
   const t = totals();
-  doc.text(`Entradas: ${money(t.entradas)}`, 14, 32);
-  doc.text(`Saídas: ${money(t.saidas)}`, 14, 40);
-  doc.text(`Reserva (Mês): ${money(t.reservaMes)}`, 14, 48);
-  doc.text(`Saldo: ${money(t.saldo)}`, 14, 56);
+  addSectionTitle("Resumo do Mês", 46);
+  doc.autoTable({
+    startY: 50,
+    theme: "grid",
+    styles: { fontSize: 10, textColor: [40, 40, 40] },
+    headStyles: { fillColor: brand, textColor: 255 },
+    head: [["Entradas", "Saídas", "Reserva (Mês)", "Saldo"]],
+    body: [[money(t.entradas), money(t.saidas), money(t.reservaMes), money(t.saldo)]],
+  });
+
+  // Outras Movimentações do mês
+  const monthEntries = state.entries
+    .filter((entry) => entry.date.startsWith(selectedMonth))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  addSectionTitle("Outras Movimentações", tableEndY() + 12);
+  doc.autoTable({
+    startY: tableEndY() + 16,
+    theme: "striped",
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: brand, textColor: 255 },
+    alternateRowStyles: { fillColor: light },
+    head: [["Data", "Tipo", "Categoria", "Descrição", "Forma", "Valor", "Pago"]],
+    body: monthEntries.length
+      ? monthEntries.map((entry) => [
+          dateLabel(entry.date),
+          entry.type,
+          entry.category,
+          entry.description || "-",
+          entry.payment,
+          money(entry.amount),
+          entry.paid ? "Sim" : "Não",
+        ])
+      : [["Nenhum lançamento neste mês", "", "", "", "", "", ""]],
+  });
+
+  // Contas Fixas
+  const activeBills = state.bills.filter((bill) => bill.active);
+  addSectionTitle("Contas Fixas", tableEndY() + 12);
+  doc.autoTable({
+    startY: tableEndY() + 16,
+    theme: "striped",
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: brand, textColor: 255 },
+    alternateRowStyles: { fillColor: light },
+    head: [["Nome", "Categoria", "Valor", "Vencimento", "Recorrência", "Status"]],
+    body: activeBills.length
+      ? activeBills.map((bill) => {
+          const status = billStatusForMonth(bill, selectedMonth);
+          return [
+            bill.name,
+            bill.category,
+            money(bill.amount),
+            `Dia ${bill.dueDay}`,
+            recurrenceLabel(bill.recurrence, selectedMonth),
+            status.label,
+          ];
+        })
+      : [["Nenhuma conta fixa ativa", "", "", "", "", ""]],
+  });
+
+  // Metas
+  addSectionTitle("Metas", tableEndY() + 12);
+  doc.autoTable({
+    startY: tableEndY() + 16,
+    theme: "striped",
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: brand, textColor: 255 },
+    alternateRowStyles: { fillColor: light },
+    head: [["Meta", "Objetivo", "Guardado", "Progresso"]],
+    body: state.goals.length
+      ? state.goals.map((goal) => [
+          goal.name,
+          money(goal.target),
+          money(goal.saved),
+          `${goal.target > 0 ? Math.min(100, Math.round((goal.saved / goal.target) * 100)) : 0}%`,
+        ])
+      : [["Nenhuma meta cadastrada", "", "", ""]],
+  });
+
+  // Reserva
+  const monthReserve = state.reserve
+    .filter((item) => item.date.startsWith(selectedMonth))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  addSectionTitle(`Reserva (Saldo acumulado: ${money(t.reservaAcumulada)})`, tableEndY() + 12);
+  doc.autoTable({
+    startY: tableEndY() + 16,
+    theme: "striped",
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: brand, textColor: 255 },
+    alternateRowStyles: { fillColor: light },
+    head: [["Data", "Tipo", "Valor", "Observação"]],
+    body: monthReserve.length
+      ? monthReserve.map((item) => [dateLabel(item.date), item.type, money(item.amount), item.note || "-"])
+      : [["Nenhuma movimentação neste mês", "", "", ""]],
+  });
+
+  // Rodapé com numeração de páginas
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i += 1) {
+    doc.setPage(i);
+    doc.setFontSize(8);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`Página ${i} de ${pageCount}`, pageWidth - 30, doc.internal.pageSize.getHeight() - 10);
+  }
 
   doc.save(`financas_${selectedMonth}.pdf`);
   showToast("PDF gerado com sucesso!");
 });
 
-document.querySelector("#importData").addEventListener("change", async (event) => {
-  const file = event.target.files[0];
-  if (!file || !supabase || !user) return;
-  try {
-    const imported = JSON.parse(await file.text());
-    showModal("Importar Dados", "A importação substituirá todos os seus dados atuais no banco. Deseja continuar?", async () => {
-      try {
-
-    // Clear existing
-    await Promise.all([
-      supabase.from('entries').delete().eq('user_id', user.id),
-      supabase.from('bills').delete().eq('user_id', user.id),
-      supabase.from('goals').delete().eq('user_id', user.id),
-      supabase.from('reserve').delete().eq('user_id', user.id),
-      supabase.from('motorista_registros').delete().eq('user_id', user.id)
-    ]);
-
-    // Map and insert
-    const entries = (imported.entries || []).map(e => ({
-      user_id: user.id,
-      date: e.date,
-      type: e.type,
-      category: e.category,
-      description: e.description,
-      payment: e.payment,
-      amount: Number(e.amount),
-      paid: e.paid,
-      note: e.note,
-      is_essential: e.is_essential,
-      fuel_value_remaining: Number(e.fuelValueRemaining || e.fuel_value_remaining || 0),
-      fuel_closed: !!(e.fuelClosed || e.fuel_closed)
-    }));
-
-    const bills = (imported.bills || []).map(b => ({
-      user_id: user.id,
-      name: b.name,
-      category: b.category,
-      amount: Number(b.amount),
-      due_day: Number(b.dueDay || b.due_day),
-      recurrence: b.recurrence,
-      active: b.active
-    }));
-
-    const goals = (imported.goals || []).map(g => ({
-      user_id: user.id,
-      name: g.name,
-      target: Number(g.target),
-      saved: Number(g.saved)
-    }));
-
-    const reserve = (imported.reserve || []).map(r => ({
-      user_id: user.id,
-      date: r.date,
-      amount: Number(r.amount),
-      type: r.type,
-      note: r.note
-    }));
-
-    const motorista = (imported.motorista || []).map(m => ({
-      user_id: user.id,
-      data: m.data,
-      uber: Number(m.uber),
-      noventa_nove: Number(m.noventa_nove),
-      quilometragem: Number(m.quilometragem),
-      preco_gasolina: Number(m.preco_gasolina),
-      consumo_veiculo: Number(m.consumo_veiculo)
-    }));
-
-        await Promise.all([
-          entries.length > 0 ? supabase.from('entries').insert(entries) : Promise.resolve(),
-          bills.length > 0 ? supabase.from('bills').insert(bills) : Promise.resolve(),
-          goals.length > 0 ? supabase.from('goals').insert(goals) : Promise.resolve(),
-          reserve.length > 0 ? supabase.from('reserve').insert(reserve) : Promise.resolve(),
-          motorista.length > 0 ? supabase.from('motorista_registros').insert(motorista) : Promise.resolve()
-        ]);
-
-        await loadData();
-        showToast("Dados importados com sucesso!");
-      } catch (err) {
-        console.error(err);
-        showToast("Erro ao importar dados. Verifique o console.", "error");
-      }
-      event.target.value = "";
-    }, () => {
-      event.target.value = "";
-    });
-  } catch (err) {
-    console.error(err);
-    showToast("Erro ao ler arquivo JSON.", "error");
-    event.target.value = "";
-  }
-});
-
 document.querySelector("#resetData").addEventListener("click", async () => {
   if (!supabase || !user) return;
-  showModal("Restaurar Exemplo", "Tem certeza que deseja apagar todos os dados e restaurar o exemplo?", async () => {
+  showModal("Resetar Dados", "Isso vai apagar TODOS os seus dados (lançamentos, contas, metas, reserva e motorista) permanentemente. Essa ação não pode ser desfeita. Deseja continuar?", async () => {
     try {
-      // Delete all entries for current user in Supabase
-    await Promise.all([
-      supabase.from('entries').delete().eq('user_id', user.id),
-      supabase.from('bills').delete().eq('user_id', user.id),
-      supabase.from('goals').delete().eq('user_id', user.id),
-      supabase.from('reserve').delete().eq('user_id', user.id),
-      supabase.from('motorista_registros').delete().eq('user_id', user.id)
-    ]);
-
-    // Insert seed data
-    const entries = seed.entries.map(e => ({
-      user_id: user.id,
-      date: e.date,
-      type: e.type,
-      category: e.category,
-      description: e.description,
-      payment: e.payment,
-      amount: e.amount,
-      paid: e.paid,
-      note: e.note,
-      is_essential: e.is_essential,
-      fuel_value_remaining: e.fuel_value_remaining || 0,
-      fuel_closed: !!e.fuel_closed
-    }));
-
-    const bills = seed.bills.map(b => ({
-      user_id: user.id,
-      name: b.name,
-      category: b.category,
-      amount: b.amount,
-      due_day: b.dueDay,
-      recurrence: b.recurrence,
-      active: b.active
-    }));
-
-    const goals = seed.goals.map(g => ({
-      user_id: user.id,
-      name: g.name,
-      target: g.target,
-      saved: g.saved
-    }));
-
       await Promise.all([
-        entries.length > 0 ? supabase.from('entries').insert(entries) : Promise.resolve(),
-        bills.length > 0 ? supabase.from('bills').insert(bills) : Promise.resolve(),
-        goals.length > 0 ? supabase.from('goals').insert(goals) : Promise.resolve()
+        supabase.from('entries').delete().eq('user_id', user.id),
+        supabase.from('bills').delete().eq('user_id', user.id),
+        supabase.from('goals').delete().eq('user_id', user.id),
+        supabase.from('reserve').delete().eq('user_id', user.id),
+        supabase.from('motorista_registros').delete().eq('user_id', user.id)
       ]);
 
       await loadData();
-      showToast("Banco restaurado com os dados de exemplo.");
+      showToast("Todos os dados foram apagados.");
     } catch (err) {
       console.error(err);
-      showToast("Erro ao restaurar exemplo.", "error");
+      showToast("Erro ao resetar os dados.", "error");
     }
   });
 });
