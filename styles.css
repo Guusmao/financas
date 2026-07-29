@@ -986,3 +986,166 @@ td {
   line-height: 1.4;
   text-align: center;
 }
+
+/* ==========================================================
+   Cards padronizados (formulários "Novo Registro" de todas as abas)
+   ========================================================== */
+.card {
+  margin-bottom: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: var(--shadow);
+}
+
+.card h3 {
+  margin: 0 0 14px;
+  font-size: 17px;
+  color: var(--ink);
+}
+
+.form-card .entry-form.compact {
+  margin-bottom: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+}
+
+/* ==========================================================
+   Modais (confirmação de exclusão, sobra de combustível, etc.)
+   Antes esta classe não tinha nenhum estilo: o modal aparecia
+   "solto" dentro do fluxo da página em vez de como uma caixa
+   central sobreposta — é a causa mais provável de a aba
+   "Outras Movimentações" parecer não funcionar ao editar/excluir.
+   ========================================================== */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(18, 48, 71, 0.55);
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal.hidden {
+  display: none !important;
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 24px;
+  box-shadow: 0 24px 64px rgba(18, 48, 71, 0.35);
+}
+
+.modal-card h3 {
+  margin: 0 0 10px;
+  font-size: 18px;
+  color: var(--ink);
+}
+
+.modal-card p {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.modal-actions .row-action {
+  min-height: 40px;
+  padding: 0 16px;
+}
+
+/* ==========================================================
+   Banner de instalação do app (PWA)
+   ========================================================== */
+.install-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  background: #123047;
+  color: #fff;
+  position: sticky;
+  top: 60px;
+  z-index: 15;
+}
+
+.install-banner.hidden {
+  display: none !important;
+}
+
+.install-banner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.install-banner-text strong {
+  font-size: 15px;
+}
+
+.install-banner-text span {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.install-banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.install-banner-actions button {
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+#installBannerBtn {
+  height: 36px;
+  padding: 0 16px;
+  background: #4a9f9a;
+  color: #fff;
+}
+
+#installBannerBtn:hover {
+  background: #3f8b86;
+}
+
+#installBannerClose {
+  height: 36px;
+  width: 36px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 16px;
+}
+
+#installBannerClose:hover {
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .install-banner {
+    flex-wrap: wrap;
+  }
+}

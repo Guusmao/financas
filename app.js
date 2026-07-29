@@ -935,7 +935,11 @@ const logoutBtn = document.querySelector("#logoutBtn");
 const installAppBtn = document.querySelector("#installAppBtn");
 const installAppTextBtn = document.querySelector("#installAppTextBtn");
 const installButtons = [installAppBtn, installAppTextBtn].filter(Boolean);
+const installBanner = document.querySelector("#install-banner");
+const installBannerBtn = document.querySelector("#installBannerBtn");
+const installBannerClose = document.querySelector("#installBannerClose");
 let deferredInstallPrompt = null;
+let installBannerDismissed = sessionStorage.getItem("installBannerDismissed") === "1";
 
 function isIosDevice() {
   return /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -946,12 +950,17 @@ function isInStandaloneMode() {
 }
 
 function updateInstallButtonVisibility() {
-  if (!installButtons.length) return;
   const canShowPrompt = !!deferredInstallPrompt;
   const canShowIosHint = isIosDevice() && !isInStandaloneMode();
+  const canShowInstall = canShowPrompt || canShowIosHint;
+
   installButtons.forEach((button) => {
-    button.classList.toggle("hidden", !(canShowPrompt || canShowIosHint));
+    button.classList.toggle("hidden", !canShowInstall);
   });
+
+  if (installBanner) {
+    installBanner.classList.toggle("hidden", !canShowInstall || installBannerDismissed);
+  }
 }
 
 window.addEventListener("beforeinstallprompt", (event) => {
@@ -982,6 +991,18 @@ const onInstallClick = async () => {
 installButtons.forEach((button) => {
   button.addEventListener("click", onInstallClick);
 });
+
+if (installBannerBtn) {
+  installBannerBtn.addEventListener("click", onInstallClick);
+}
+
+if (installBannerClose) {
+  installBannerClose.addEventListener("click", () => {
+    installBannerDismissed = true;
+    sessionStorage.setItem("installBannerDismissed", "1");
+    if (installBanner) installBanner.classList.add("hidden");
+  });
+}
 
 if (!isConfigured) {
   authError.innerHTML = `<strong>Configuração necessária!</strong><br>Use <code>.env</code> (Vite) ou <code>config.js</code> (Go Live) com URL e chave anon do Supabase. Veja <code>.env.example</code> e <code>config.example.js</code>.`;

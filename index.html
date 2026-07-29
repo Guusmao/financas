@@ -32,6 +32,17 @@
         </div>
       </header>
 
+      <div id="install-banner" class="install-banner hidden">
+        <div class="install-banner-text">
+          <strong>Instalar Finanças</strong>
+          <span>Adicione à tela inicial para abrir como aplicativo</span>
+        </div>
+        <div class="install-banner-actions">
+          <button id="installBannerBtn" type="button">Instalar</button>
+          <button id="installBannerClose" type="button" aria-label="Fechar">✕</button>
+        </div>
+      </div>
+
       <aside id="drawer-menu" class="drawer">
         <div class="drawer-header">
           <div class="brand">
@@ -283,21 +294,28 @@
               <p>Cadastro de despesas recorrentes</p>
             </div>
           </header>
-          <form id="contaForm" class="entry-form compact">
-            <input name="name" placeholder="Nome" required />
-            <select name="category" required></select>
-            <input name="amount" type="text" inputmode="decimal" placeholder="Valor (ex: 1.234,56)" required />
-            <input name="dueDay" type="number" min="1" max="31" placeholder="Venc." required />
-            <select name="recurrence">
-              <option>Mensal</option>
-              <option>Anual</option>
-              <option>Única</option>
-              <option>Parcelado</option>
-            </select>
-            <input name="installments" type="number" min="2" max="120" placeholder="Parcelas" value="12" hidden />
-            <label class="check-field"><input name="active" type="checkbox" checked /> Ativa</label>
-            <button type="submit">Adicionar</button>
-          </form>
+          <section class="card form-card">
+            <h3>Novo Registro</h3>
+            <form id="contaForm" class="entry-form-modern">
+              <div class="form-grid">
+                <input name="name" placeholder="Nome" required />
+                <select name="category" required></select>
+                <input name="amount" type="text" inputmode="decimal" placeholder="Valor (ex: 1.234,56)" required />
+                <input name="dueDay" type="number" min="1" max="31" placeholder="Venc." required />
+                <select name="recurrence">
+                  <option>Mensal</option>
+                  <option>Anual</option>
+                  <option>Única</option>
+                  <option>Parcelado</option>
+                </select>
+                <input name="installments" type="number" min="2" max="120" placeholder="Parcelas" value="12" hidden />
+              </div>
+              <div class="form-actions">
+                <label class="check-field"><input name="active" type="checkbox" checked /> Ativa</label>
+                <button type="submit" class="primary">Salvar Registro</button>
+              </div>
+            </form>
+          </section>
           <div class="bills-toolbar" aria-label="Ordenação de contas fixas">
             <label>
               Ordenar por
@@ -327,12 +345,19 @@
               <p>Objetivos e progresso</p>
             </div>
           </header>
-          <form id="metaForm" class="entry-form compact">
-            <input name="name" placeholder="Meta" required />
-            <input name="target" type="text" inputmode="decimal" placeholder="Objetivo (ex: 10.000,00)" required />
-            <input name="saved" type="text" inputmode="decimal" placeholder="Já guardado (ex: 1.500,00)" required />
-            <button type="submit">Adicionar</button>
-          </form>
+          <section class="card form-card">
+            <h3>Novo Registro</h3>
+            <form id="metaForm" class="entry-form-modern">
+              <div class="form-grid">
+                <input name="name" placeholder="Meta" required />
+                <input name="target" type="text" inputmode="decimal" placeholder="Objetivo (ex: 10.000,00)" required />
+                <input name="saved" type="text" inputmode="decimal" placeholder="Já guardado (ex: 1.500,00)" required />
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="primary">Salvar Registro</button>
+              </div>
+            </form>
+          </section>
           <div id="metasList" class="cards-list"></div>
         </section>
 
@@ -343,16 +368,23 @@
               <p>Movimentações separadas</p>
             </div>
           </header>
-          <form id="reservaForm" class="entry-form compact">
-            <input type="date" name="date" required />
-            <input name="amount" type="text" inputmode="decimal" placeholder="Valor (ex: 1.234,56)" required />
-            <select name="type">
-              <option>Entrada</option>
-              <option>Saída</option>
-            </select>
-            <input name="note" placeholder="Observação" />
-            <button type="submit">Adicionar</button>
-          </form>
+          <section class="card form-card">
+            <h3>Novo Registro</h3>
+            <form id="reservaForm" class="entry-form-modern">
+              <div class="form-grid">
+                <input type="date" name="date" required />
+                <input name="amount" type="text" inputmode="decimal" placeholder="Valor (ex: 1.234,56)" required />
+                <select name="type">
+                  <option>Entrada</option>
+                  <option>Saída</option>
+                </select>
+                <input name="note" placeholder="Observação" />
+              </div>
+              <div class="form-actions">
+                <button type="submit" class="primary">Salvar Registro</button>
+              </div>
+            </form>
+          </section>
           <div class="table-wrap">
             <table>
               <thead>
@@ -453,7 +485,7 @@
        Formulário
   ========================== -->
 
-  <section class="card">
+  <section class="card form-card">
 
     <h3>Novo Registro</h3>
 
