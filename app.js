@@ -1186,6 +1186,25 @@ if (lancamentoForm) {
       render();
     }
 
+    // Uma Saída com Categoria "Reserva" representa dinheiro retirado da
+    // reserva/poupança para pagar algo — debita automaticamente o saldo
+    // guardado, lançando um movimento correspondente na aba Reserva.
+    if (saved && !editingEntryId && category === "Reserva" && type === "Saída") {
+      const reserveMovement = {
+        user_id: user.id,
+        date: entry.date,
+        amount: entry.amount,
+        type: "Saída",
+        note: `Automático: ${entry.description}`,
+      };
+      const { error: reserveError } = await supabase.from('reserve').insert(reserveMovement);
+      if (reserveError) {
+        showToast("Lançamento salvo, mas não foi possível debitar da Reserva: " + reserveError.message, "error");
+      } else {
+        showToast(`${money(entry.amount)} debitado automaticamente da Reserva.`, "info");
+      }
+    }
+
     resetEntryForm();
     await loadData();
   });
