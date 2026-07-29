@@ -231,6 +231,14 @@ select {
   .sidebar-action span {
     display: inline;
   }
+  .sidebar-footer {
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+  .sidebar-action {
+    flex: none;
+    width: 100%;
+  }
 }
 
 .sidebar-action:hover {
