@@ -823,6 +823,10 @@ td {
   .driver-form .form-grid {
     grid-template-columns: repeat(2, minmax(140px, 1fr));
   }
+
+  .entry-form-modern .form-grid {
+    grid-template-columns: repeat(2, minmax(140px, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -845,8 +849,17 @@ td {
     grid-template-columns: 1fr;
   }
 
+  .entry-form-modern .form-grid {
+    grid-template-columns: 1fr;
+  }
+
   .driver-form .primary {
     width: 100%;
+  }
+
+  .entry-form-modern .form-actions .primary {
+    width: 100%;
+    margin-left: 0;
   }
 
   .summary-card strong {
