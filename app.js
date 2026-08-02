@@ -1206,7 +1206,6 @@ if (lancamentoForm) {
     }
 
     resetEntryForm();
-    await loadData();
   });
 }
 
@@ -1260,7 +1259,6 @@ document.querySelector("#contaForm").addEventListener("submit", async (event) =>
   }
 
   resetBillForm();
-  await loadData();
 });
 
 document.querySelector("#metaForm").addEventListener("submit", async (event) => {
@@ -1298,7 +1296,6 @@ document.querySelector("#metaForm").addEventListener("submit", async (event) => 
   }
 
   resetGoalForm();
-  await loadData();
 });
 
 document.querySelector("#reservaForm").addEventListener("submit", async (event) => {
@@ -1338,7 +1335,6 @@ document.querySelector("#reservaForm").addEventListener("submit", async (event) 
   }
 
   resetReserveForm();
-  await loadData();
 });
 
 // ======================================================
