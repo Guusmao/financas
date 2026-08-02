@@ -1,15 +1,15 @@
 :root {
-  --ink: #1f2933;
-  --muted: #667085;
-  --line: #d8dee9;
-  --paper: #f6f7fb;
-  --panel: #ffffff;
+  --ink: #e8edf3;
+  --muted: #8b98ab;
+  --line: #263449;
+  --paper: #0b1420;
+  --panel: #101d2e;
   --blue: #5b9bd5;
-  --gold: #c89f37;
-  --green: #5fa46b;
-  --red: #d76b6b;
-  --teal: #4a9f9a;
-  --shadow: 0 16px 40px rgba(31, 41, 51, 0.1);
+  --gold: #d9a441;
+  --green: #34d399;
+  --red: #f87171;
+  --teal: #2dd4bf;
+  --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -21,8 +21,33 @@ body {
   min-height: 100vh;
   color: var(--ink);
   background: var(--paper);
-  font-family: Calibri, "Segoe UI", Arial, sans-serif;
+  font-family: "Manrope", "Segoe UI", Arial, sans-serif;
   letter-spacing: 0;
+}
+
+.amount,
+.summary-card strong,
+.kpi-chip strong,
+td:has(.amount),
+[id^="total"],
+[id^="kpi"],
+[id^="driverTotal"] {
+  font-family: "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+input,
+select,
+textarea {
+  color: var(--ink);
+  border-color: var(--line);
+  background: var(--panel);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
 }
 
 button,
@@ -43,7 +68,8 @@ select {
   gap: 16px;
   height: 60px;
   padding: 0 16px;
-  background: linear-gradient(180deg, #3f6f9f 0%, #294962 100%);
+  background: linear-gradient(180deg, #16273d 0%, #0b1420 100%);
+  border-bottom: 1px solid var(--line);
   color: #fff;
   position: sticky;
   top: 0;
@@ -65,13 +91,17 @@ select {
   margin: 0;
 }
 
+.topbar-brand {
+  cursor: pointer;
+}
+
 .drawer {
   display: flex;
   flex-direction: column;
   gap: 28px;
   padding: 24px 18px;
   color: #fff;
-  background: linear-gradient(180deg, #3f6f9f 0%, #294962 100%);
+  background: linear-gradient(180deg, #16273d 0%, #0b1420 100%);
   position: fixed;
   top: 0;
   left: -280px;
@@ -180,8 +210,8 @@ select {
 
 .nav-tab.active,
 .nav-tab:hover {
-  color: #123047;
-  background: #ffffff;
+  color: var(--ink);
+  background: rgba(91, 155, 213, 0.24);
 }
 
 .nav-tab.active svg,
@@ -282,7 +312,7 @@ select {
 }
 
 .page-header h2 {
-  color: #1e5d8f;
+  color: var(--ink);
   font-size: 28px;
 }
 
@@ -296,7 +326,7 @@ select {
   padding: 10px 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--panel);
   text-align: left;
 }
 
@@ -310,7 +340,7 @@ select {
   border: 0;
   font-weight: 700;
   font-size: 16px;
-  color: #1e5d8f;
+  color: var(--ink);
   outline: none;
   cursor: pointer;
   background: transparent;
@@ -381,17 +411,17 @@ select {
   min-height: 82px;
   padding: 12px 14px;
   border: 1px solid var(--line);
-  border-left: 5px solid #5b9bd5;
+  border-left: 5px solid var(--blue);
   border-radius: 8px;
-  background: #fff;
+  background: var(--panel);
 }
 
 .kpi-chip.warning {
-  border-left-color: #c89f37;
+  border-left-color: var(--gold);
 }
 
 .kpi-chip.success {
-  border-left-color: #5fa46b;
+  border-left-color: var(--green);
 }
 
 .kpi-chip span {
@@ -403,7 +433,7 @@ select {
 .kpi-chip strong {
   display: block;
   margin-top: 8px;
-  color: #123047;
+  color: var(--ink);
   font-size: 24px;
 }
 
@@ -418,7 +448,7 @@ select {
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -430,6 +460,10 @@ select {
 }
 
 .history-panel {
+  grid-column: span 12;
+}
+
+.comparison-panel {
   grid-column: span 12;
 }
 
@@ -461,18 +495,18 @@ select {
 .mini-action {
   min-height: 28px;
   padding: 0 10px;
-  border: 1px solid #cfd7e3;
+  border: 1px solid var(--line);
   border-radius: 999px;
-  background: #f5f8fc;
-  color: #1e5d8f;
+  background: rgba(91, 155, 213, 0.12);
+  color: var(--ink);
   font-size: 12px;
   cursor: pointer;
 }
 
 .mini-action.active {
-  color: #fff;
-  border-color: #2f75a8;
-  background: #2f75a8;
+  color: var(--paper);
+  border-color: var(--blue);
+  background: var(--blue);
 }
 
 .compact-list,
@@ -492,7 +526,7 @@ select {
   padding: 10px 12px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: #fbfcfe;
+  background: #0f1b2b;
 }
 
 .list-row small,
@@ -521,18 +555,18 @@ select {
 }
 
 .status.ok {
-  color: #236232;
-  background: #e4f4e8;
+  color: var(--paper);
+  background: var(--green);
 }
 
 .status.warn {
-  color: #8a520f;
-  background: #fff0d2;
+  color: var(--paper);
+  background: var(--gold);
 }
 
 .status.unpaid {
-  color: #8f1f1f;
-  background: #ffe2e2;
+  color: var(--paper);
+  background: var(--red);
 }
 
 .bill-actions {
@@ -551,7 +585,7 @@ select {
   margin-bottom: 14px;
   padding: 12px;
   border-radius: 6px;
-  background: #fff8e2;
+  background: rgba(217, 164, 65, 0.14);
 }
 
 .reserve-total span {
@@ -583,7 +617,7 @@ select {
   height: 18px;
   overflow: hidden;
   border-radius: 4px;
-  background: #edf1f6;
+  background: #1a2a3f;
 }
 
 .bar i {
@@ -595,6 +629,11 @@ select {
   transition: width 0.2s ease;
 }
 
+.comparison-panel canvas,
+.history-panel canvas {
+  max-width: 100%;
+}
+
 .entry-form {
   display: grid;
   grid-template-columns: 140px 130px 160px minmax(180px, 1fr) 140px 120px 96px 150px 120px;
@@ -603,7 +642,7 @@ select {
   padding: 14px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -630,9 +669,9 @@ select {
 .bills-toolbar select {
   height: 36px;
   padding: 0 10px;
-  border: 1px solid #cfd7e3;
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: #fff;
+  background: var(--panel);
 }
 
 .driver-form {
@@ -684,9 +723,9 @@ select {
   min-width: 0;
   height: 40px;
   padding: 0 10px;
-  border: 1px solid #cfd7e3;
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: #fff;
+  background: var(--panel);
 }
 
 .check-field {
@@ -708,22 +747,22 @@ select {
   border: 0;
   border-radius: 6px;
   color: #fff;
-  background: #2f75a8;
+  background: var(--blue);
   cursor: pointer;
 }
 
 .row-action {
   min-height: 32px;
   padding: 0 10px;
-  background: #9b3f3f;
+  background: var(--red);
 }
 
 .row-action.pay {
-  background: #2e8b57;
+  background: var(--green);
 }
 
 .row-action.neutral {
-  background: #5f6f85;
+  background: #4a5f79;
 }
 
 td .row-action + .row-action {
@@ -734,7 +773,7 @@ td .row-action + .row-action {
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -754,12 +793,12 @@ td {
 }
 
 th {
-  color: #fff;
-  background: #7e5a11;
+  color: var(--paper);
+  background: var(--gold);
 }
 
 td {
-  background: #fff;
+  background: var(--panel);
 }
 
 .progress {
@@ -767,7 +806,7 @@ td {
   margin-top: 8px;
   overflow: hidden;
   border-radius: 99px;
-  background: #e8edf3;
+  background: #1a2a3f;
 }
 
 .progress i {
@@ -881,19 +920,19 @@ td {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #3f6f9f 0%, #123047 100%);
+  background: linear-gradient(135deg, #16273d 0%, #0b1420 100%);
   z-index: 9999;
   padding: 20px;
 }
 
 .auth-card {
-  background: #ffffff;
+  background: var(--panel);
   width: 100%;
   max-width: 400px;
   border-radius: 12px;
   padding: 36px 32px;
-  box-shadow: 0 24px 64px rgba(18, 48, 71, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
+  border: 1px solid var(--line);
 }
 
 .auth-header {
@@ -906,15 +945,15 @@ td {
 }
 
 .auth-header .brand-mark {
-  border-color: #3f6f9f;
-  color: #3f6f9f;
-  background: rgba(63, 111, 159, 0.08);
+  border-color: var(--blue);
+  color: var(--blue);
+  background: rgba(91, 155, 213, 0.15);
 }
 
 .auth-header h2 {
   margin: 0;
   font-size: 24px;
-  color: #123047;
+  color: var(--ink);
 }
 
 .auth-header p {
@@ -945,16 +984,16 @@ td {
   width: 100%;
   height: 42px;
   padding: 0 12px;
-  border: 1px solid #cfd7e3;
+  border: 1px solid var(--line);
   border-radius: 6px;
-  background: #fff;
+  background: var(--panel);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .form-group input:focus {
   outline: none;
-  border-color: #3f6f9f;
-  box-shadow: 0 0 0 3px rgba(63, 111, 159, 0.15);
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(91, 155, 213, 0.2);
 }
 
 #auth-submit-btn {
@@ -962,7 +1001,7 @@ td {
   border: 0;
   border-radius: 6px;
   color: #fff;
-  background: #2f75a8;
+  background: var(--blue);
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
@@ -971,7 +1010,7 @@ td {
 }
 
 #auth-submit-btn:hover {
-  background: #1e5d8f;
+  background: #3f83c0;
 }
 
 .auth-switch {
@@ -984,7 +1023,7 @@ td {
 #auth-toggle-btn {
   border: 0;
   background: none;
-  color: #2f75a8;
+  color: #7bc5f3;
   font-weight: 600;
   cursor: pointer;
   padding: 0;
@@ -993,15 +1032,15 @@ td {
 }
 
 #auth-toggle-btn:hover {
-  color: #1e5d8f;
+  color: #a9ddff;
 }
 
 .auth-error {
   margin-top: 18px;
   padding: 12px;
-  background: #ffebeb;
-  border: 1px solid #ffd1d1;
-  color: #c93b3b;
+  background: rgba(248, 113, 113, 0.14);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: #fecaca;
   border-radius: 6px;
   font-size: 13px;
   line-height: 1.4;
@@ -1016,7 +1055,7 @@ td {
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--panel);
   box-shadow: var(--shadow);
 }
 
@@ -1061,10 +1100,10 @@ td {
 .modal-card {
   width: 100%;
   max-width: 420px;
-  background: #fff;
+  background: var(--panel);
   border-radius: 10px;
   padding: 24px;
-  box-shadow: 0 24px 64px rgba(18, 48, 71, 0.35);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.45);
 }
 
 .modal-card h3 {
@@ -1101,7 +1140,7 @@ td {
   justify-content: space-between;
   gap: 16px;
   padding: 14px 16px;
-  background: #123047;
+  background: #16273d;
   color: #fff;
   position: sticky;
   top: 60px;
@@ -1145,12 +1184,12 @@ td {
 #installBannerBtn {
   height: 36px;
   padding: 0 16px;
-  background: #4a9f9a;
+  background: var(--teal);
   color: #fff;
 }
 
 #installBannerBtn:hover {
-  background: #3f8b86;
+  background: #1bbfa9;
 }
 
 #installBannerClose {
@@ -1202,15 +1241,15 @@ td {
 }
 
 .toast.success {
-  background: #4a9f9a;
+  background: var(--teal);
 }
 
 .toast.error {
-  background: #d76b6b;
+  background: var(--red);
 }
 
 .toast.info {
-  background: #2f75a8;
+  background: var(--blue);
 }
 
 @keyframes toast-in {

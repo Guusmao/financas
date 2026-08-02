@@ -58,6 +58,8 @@ let editingReserveId = null;
 let editingDriverId = null;
 let billsSortBy = "dueDay";
 let billsSortDirection = "asc";
+let historyChartInstance = null;
+let comparisonChartInstance = null;
 
 function money(value) {
   return Number(value || 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -569,6 +571,126 @@ function totals() {
   };
 }
 
+function monthLabelShort(monthKey) {
+  const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+  const [year, month] = monthKey.split("-").map(Number);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return monthKey;
+  return `${monthNames[month - 1]}/${year}`;
+}
+
+function getRecentMonths(baseMonth, count = 3) {
+  const [year, month] = baseMonth.split("-").map(Number);
+  if (!Number.isFinite(year) || !Number.isFinite(month)) return [];
+
+  const months = [];
+  for (let offset = count - 1; offset >= 0; offset--) {
+    const date = new Date(year, month - 1 - offset, 1);
+    months.push(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`);
+  }
+  return months;
+}
+
+function renderHistoryChart(total) {
+  const canvas = document.querySelector("#historyChart");
+  const ChartLib = window.Chart;
+  if (!canvas || !ChartLib) return;
+
+  if (historyChartInstance) {
+    historyChartInstance.destroy();
+  }
+
+  historyChartInstance = new ChartLib(canvas, {
+    type: "bar",
+    data: {
+      labels: ["Entradas", "Saídas", "Reserva"],
+      datasets: [{
+        label: "Valor",
+        data: [total.entradas, total.saidas, total.reservaMes],
+        backgroundColor: ["#2f75a8", "#c45252", "#c89f37"],
+        borderRadius: 8,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: (value) => money(value),
+          },
+        },
+      },
+    },
+  });
+}
+
+function renderComparisonChart() {
+  const canvas = document.querySelector("#comparisonChart");
+  const label = document.querySelector("#comparisonMonthsLabel");
+  const ChartLib = window.Chart;
+  if (label) label.textContent = "Últimos 3 meses";
+  if (!canvas || !ChartLib) return;
+
+  const months = getRecentMonths(selectedMonth, 3);
+  const labels = months.map(monthLabelShort);
+  const entradas = months.map((month) => state.entries
+    .filter((entry) => entry.date.startsWith(month) && entry.type === "Entrada")
+    .reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0));
+  const saidas = months.map((month) => state.entries
+    .filter((entry) => entry.date.startsWith(month) && entry.type === "Saída")
+    .reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0));
+
+  if (comparisonChartInstance) {
+    comparisonChartInstance.destroy();
+  }
+
+  comparisonChartInstance = new ChartLib(canvas, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        {
+          label: "Entradas",
+          data: entradas,
+          borderColor: "#2f75a8",
+          backgroundColor: "rgba(47, 117, 168, 0.2)",
+          tension: 0.3,
+          fill: false,
+        },
+        {
+          label: "Saídas",
+          data: saidas,
+          borderColor: "#c45252",
+          backgroundColor: "rgba(196, 82, 82, 0.2)",
+          tension: 0.3,
+          fill: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: "top",
+        },
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            callback: (value) => money(value),
+          },
+        },
+      },
+    },
+  });
+}
+
 function renderDashboard() {
   const total = totals();
   document.querySelector("#totalEntradas").textContent = money(total.entradas);
@@ -643,10 +765,8 @@ function renderDashboard() {
     <span class="amount">${item.type === "Saída" ? "-" : ""}${money(item.amount)}</span>
   </div>`).join("") || emptyRow("Sem movimentos");
 
-  const max = Math.max(total.entradas, total.saidas, total.reservaMes, 1);
-  document.querySelector("#barEntradas").style.width = `${(total.entradas / max) * 100}%`;
-  document.querySelector("#barSaidas").style.width = `${(total.saidas / max) * 100}%`;
-  document.querySelector("#barReserva").style.width = `${(total.reservaMes / max) * 100}%`;
+  renderHistoryChart(total);
+  renderComparisonChart();
 
 }
 
@@ -914,6 +1034,10 @@ document.querySelector(".nav-tabs").addEventListener("click", (event) => {
   const button = event.target.closest(".nav-tab");
   if (!button) return;
   switchTab(button.dataset.tab);
+});
+
+document.querySelector(".topbar-brand")?.addEventListener("click", () => {
+  switchTab("dashboard");
 });
 
 document.querySelector("#toggleUnpaidBills")?.addEventListener("click", () => {

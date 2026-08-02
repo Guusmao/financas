@@ -11,6 +11,9 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' https://cdnjs.cloudflare.com; worker-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co; font-src 'self' https://fonts.gstatic.com data:; frame-ancestors 'none';" />
     <title>Finanças Pessoais</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
     <link rel="manifest" href="/site.webmanifest" />
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/icon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/icon-16.png" />
@@ -19,6 +22,7 @@
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
   </head>
   <body>
     <div id="drawer-backdrop" class="drawer-backdrop hidden"></div>
@@ -163,6 +167,22 @@
           </section>
 
           <section class="dashboard-grid">
+            <div class="panel history-panel">
+              <div class="panel-title">
+                <h3>Histórico</h3>
+                <span id="historyMonthLabel"></span>
+              </div>
+              <canvas id="historyChart" height="220"></canvas>
+            </div>
+
+            <div class="panel comparison-panel">
+              <div class="panel-title">
+                <h3>Comparativo Mensal</h3>
+                <span id="comparisonMonthsLabel"></span>
+              </div>
+              <canvas id="comparisonChart" height="220"></canvas>
+            </div>
+
             <div class="panel fixed-panel">
               <div class="panel-title">
                 <h3>Contas Fixas</h3>
@@ -200,27 +220,6 @@
                 <strong id="dashboardReserva">R$ 0,00</strong>
               </div>
               <div id="dashboardReservaMovimentos" class="mini-table"></div>
-            </div>
-
-            <div class="panel history-panel">
-              <div class="panel-title">
-                <h3>Histórico</h3>
-                <span id="historyMonthLabel"></span>
-              </div>
-              <div class="bar-chart">
-                <div>
-                  <span>Entradas</span>
-                  <div class="bar"><i id="barEntradas"></i></div>
-                </div>
-                <div>
-                  <span>Saídas</span>
-                  <div class="bar"><i id="barSaidas"></i></div>
-                </div>
-                <div>
-                  <span>Reserva</span>
-                  <div class="bar"><i id="barReserva"></i></div>
-                </div>
-              </div>
             </div>
 
           </section>
