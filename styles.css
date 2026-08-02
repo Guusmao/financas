@@ -10,6 +10,7 @@
   --red: #f87171;
   --teal: #2dd4bf;
   --shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
 }
 
 * {
@@ -354,6 +355,14 @@ select {
   -moz-appearance: none;
   appearance: none;
   min-height: 44px;
+}
+
+.month-select option,
+.entry-form select option,
+.entry-form-modern .form-grid select option,
+.bills-toolbar select option {
+  background: var(--panel);
+  color: var(--ink);
 }
 
 .summary-grid {
