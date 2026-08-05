@@ -26,6 +26,69 @@ function resumoRegistro(registro) {
   return { combustivel, bruto, liquido };
 }
 
+function weekRangeLabel(selectedMonth, weekIndex) {
+  const [year, month] = selectedMonth.split("-").map(Number);
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const startDay = (weekIndex - 1) * 7 + 1;
+  const endDay = Math.min(startDay + 6, daysInMonth);
+  return `Semana ${weekIndex} (${String(startDay).padStart(2, "0")} a ${String(endDay).padStart(2, "0")})`;
+}
+
+function renderGanhosSemanais(registrosMes, selectedMonth, money) {
+  const list = document.querySelector("#driverWeeklyList");
+  if (!list) return;
+
+  const weeklyTotals = new Map();
+
+  registrosMes.forEach((registro) => {
+    const day = Number(String(registro.data || "").slice(8, 10));
+    if (!Number.isFinite(day) || day <= 0) return;
+
+    const weekIndex = Math.floor((day - 1) / 7) + 1;
+    if (!weeklyTotals.has(weekIndex)) {
+      weeklyTotals.set(weekIndex, {
+        bruto: 0,
+        combustivel: 0,
+        liquido: 0,
+        dias: 0,
+      });
+    }
+
+    const summary = weeklyTotals.get(weekIndex);
+    const { combustivel, bruto, liquido } = resumoRegistro(registro);
+    summary.bruto += bruto;
+    summary.combustivel += combustivel;
+    summary.liquido += liquido;
+    summary.dias += 1;
+  });
+
+  const weekIndexes = Array.from(weeklyTotals.keys()).sort((a, b) => a - b);
+
+  if (!weekIndexes.length) {
+    list.innerHTML = `<div class="list-row"><div><strong>Sem registros no mês</strong><small>Adicione corridas para ver o resumo semanal.</small></div></div>`;
+    return;
+  }
+
+  list.innerHTML = weekIndexes
+    .map((weekIndex) => {
+      const week = weeklyTotals.get(weekIndex);
+      return `
+        <div class="list-row">
+          <div>
+            <strong>${weekRangeLabel(selectedMonth, weekIndex)}</strong>
+            <small>${week.dias} dia(s) trabalhado(s)</small>
+          </div>
+          <div>
+            <small>Bruto: ${money(week.bruto)}</small>
+            <small>Combustível: ${money(week.combustivel)}</small>
+            <strong>${money(week.liquido)}</strong>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
 export function renderMotorista(registros, selectedMonth, money, dateLabel) {
   const registrosMes = registros.filter((registro) => registro.data.startsWith(selectedMonth));
 
@@ -44,6 +107,8 @@ export function renderMotorista(registros, selectedMonth, money, dateLabel) {
   document.querySelector("#driverTotalLiquido").textContent = money(totalLiquido);
   document.querySelector("#driverTotalCombustivel").textContent = money(totalCombustivel);
   document.querySelector("#driverDias").textContent = registrosMes.length;
+
+  renderGanhosSemanais(registrosMes, selectedMonth, money);
 
   document.querySelector("#driverTable").innerHTML = registrosMes
     .map((registro) => {

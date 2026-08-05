@@ -855,7 +855,8 @@ td {
   .spending-panel,
   .goals-panel,
   .reserve-panel,
-  .history-panel {
+  .history-panel,
+  .comparison-panel {
     grid-column: span 1;
   }
 
