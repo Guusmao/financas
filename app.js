@@ -203,6 +203,51 @@ function toFiniteNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function driverCusto(registro) {
+  const km = toFiniteNumber(registro?.quilometragem);
+  const consumo = toFiniteNumber(registro?.consumo_veiculo);
+  const gasolina = toFiniteNumber(registro?.preco_gasolina);
+  if (km <= 0 || consumo <= 0 || gasolina <= 0) return 0;
+  return (km / consumo) * gasolina;
+}
+
+async function adjustTankEntry(tankEntryId, delta) {
+  if (!supabase || !user || !tankEntryId || !Number.isFinite(delta) || delta === 0) {
+    return { ok: true, skipped: true };
+  }
+
+  const entry = state.entries.find((item) => item.id === tankEntryId);
+  if (!entry) {
+    return { ok: false, error: new Error("Abastecimento vinculado não encontrado no estado local.") };
+  }
+
+  const valorOriginal = Math.max(0, toFiniteNumber(entry.amount));
+  const atual = Math.max(0, toFiniteNumber(entry.fuel_value_remaining));
+  const proximo = Math.min(valorOriginal, Math.max(0, atual + delta));
+  const fechado = proximo === 0;
+
+  const { error } = await supabase
+    .from("entries")
+    .update({
+      fuel_value_remaining: proximo,
+      fuel_closed: fechado,
+    })
+    .eq("id", tankEntryId)
+    .eq("user_id", user.id);
+
+  if (error) {
+    return { ok: false, error };
+  }
+
+  state.entries = state.entries.map((item) => (
+    item.id === tankEntryId
+      ? { ...item, fuel_value_remaining: proximo, fuel_closed: fechado }
+      : item
+  ));
+
+  return { ok: true, remaining: proximo, closed: fechado };
+}
+
 function yearMonth(value) {
   const text = String(value || "").trim();
   if (/^\d{4}-\d{2}/.test(text)) return text.slice(0, 7);
@@ -942,7 +987,8 @@ async function loadData() {
       noventa_nove: Number(item.noventa_nove),
       quilometragem: Number(item.quilometragem),
       preco_gasolina: Number(item.preco_gasolina),
-      consumo_veiculo: Number(item.consumo_veiculo)
+      consumo_veiculo: Number(item.consumo_veiculo),
+      tank_entry_id: item.tank_entry_id || null,
     }));
 
     await ensureInstallmentsForMonth();
@@ -1476,6 +1522,13 @@ document.querySelector("#driverForm").addEventListener("submit", async (event) =
   const submitButton = event.currentTarget.querySelector('button[type="submit"]');
   submitButton.disabled = true;
 
+  const existingRegistro = editingDriverId
+    ? state.motorista.find((item) => item.id === editingDriverId)
+    : null;
+  const openTank = !editingDriverId
+    ? state.entries.find((e) => e.type === "Saída" && e.category === "Abastecimento" && !e.fuel_closed)
+    : null;
+
   const registro = {
     user_id: user.id,
     data: document.querySelector("#driverData").value,
@@ -1483,12 +1536,12 @@ document.querySelector("#driverForm").addEventListener("submit", async (event) =
     noventa_nove: normalizeAmount(document.querySelector("#driver99").value || 0),
     quilometragem: normalizeAmount(document.querySelector("#driverKm").value || 0),
     preco_gasolina: normalizeAmount(document.querySelector("#driverGasolina").value || 0),
-    consumo_veiculo: normalizeAmount(document.querySelector("#driverConsumo").value || 0)
+    consumo_veiculo: normalizeAmount(document.querySelector("#driverConsumo").value || 0),
+    tank_entry_id: editingDriverId ? (existingRegistro?.tank_entry_id || null) : (openTank?.id || null),
   };
 
-  const custo = (registro.quilometragem > 0 && registro.consumo_veiculo > 0) 
-    ? (registro.quilometragem / registro.consumo_veiculo) * registro.preco_gasolina 
-    : 0;
+  const custoNovo = driverCusto(registro);
+  const custoAnterior = driverCusto(existingRegistro);
 
   const { data: saved, error } = editingDriverId
     ? await supabase
@@ -1504,30 +1557,35 @@ document.querySelector("#driverForm").addEventListener("submit", async (event) =
         .select()
         .single();
 
-  if (!error && !editingDriverId) {
-    const openTank = state.entries.find(e => e.type === "Saída" && e.category === "Abastecimento" && !e.fuel_closed);
-    if (openTank && custo > 0) {
-      const newRemaining = Math.max(0, openTank.fuel_value_remaining - custo);
-      const closed = newRemaining === 0;
-      const { error: tankError } = await supabase.from('entries').update({
-        fuel_value_remaining: newRemaining,
-        fuel_closed: closed
-      }).eq('id', openTank.id);
-      
-      if (!tankError) {
-        openTank.fuel_value_remaining = newRemaining;
-        openTank.fuel_closed = closed;
-        if (closed) showToast("O combustível do tanque acabou!", "info");
-      }
-    }
-  }
-
   submitButton.disabled = false;
 
   if (error) {
     console.error(error);
     alert(error.message);
     return;
+  }
+
+  if (!editingDriverId && openTank && custoNovo > 0) {
+    const tankResult = await adjustTankEntry(openTank.id, -custoNovo);
+    if (!tankResult.ok) {
+      showToast("Registro salvo, mas houve erro ao debitar do tanque.", "error");
+      console.error("Erro ao debitar tanque:", tankResult.error);
+    } else if (tankResult.closed) {
+      showToast("O combustível do tanque acabou!", "info");
+    }
+  }
+
+  if (editingDriverId && existingRegistro?.tank_entry_id) {
+    const delta = custoAnterior - custoNovo;
+    if (delta !== 0) {
+      const tankResult = await adjustTankEntry(existingRegistro.tank_entry_id, delta);
+      if (!tankResult.ok) {
+        showToast("Registro atualizado, mas houve erro ao ajustar o tanque.", "error");
+        console.error("Erro ao ajustar tanque na edição:", tankResult.error);
+      } else if (tankResult.closed) {
+        showToast("O combustível do tanque acabou!", "info");
+      }
+    }
   }
 
   const registroMonth = String(registro.data || "").slice(0, 7);
@@ -1555,6 +1613,7 @@ document.querySelector("#driverForm").addEventListener("submit", async (event) =
       quilometragem: Number(saved.quilometragem),
       preco_gasolina: Number(saved.preco_gasolina),
       consumo_veiculo: Number(saved.consumo_veiculo),
+      tank_entry_id: saved.tank_entry_id || null,
     };
     state.motorista = editingDriverId
       ? state.motorista.map((item) => (item.id === normalized.id ? normalized : item))
@@ -1764,6 +1823,34 @@ document.body.addEventListener("click", async (event) => {
     if (id) {
       showModal("Confirmar exclusão", "Tem certeza que deseja excluir este item?", async () => {
         button.disabled = true;
+
+        if (map.key === "deleteDriver") {
+          const { data: registroMotorista, error: findDriverError } = await supabase
+            .from("motorista_registros")
+            .select("id, quilometragem, consumo_veiculo, preco_gasolina, tank_entry_id")
+            .eq("id", id)
+            .eq("user_id", user.id)
+            .single();
+
+          if (findDriverError) {
+            showToast("Erro ao localizar corrida antes da exclusão: " + findDriverError.message, "error");
+            button.disabled = false;
+            return;
+          }
+
+          if (registroMotorista?.tank_entry_id) {
+            const custo = driverCusto(registroMotorista);
+            if (custo > 0) {
+              const tankResult = await adjustTankEntry(registroMotorista.tank_entry_id, custo);
+              if (!tankResult.ok) {
+                showToast("Erro ao estornar combustível do tanque: " + tankResult.error.message, "error");
+                button.disabled = false;
+                return;
+              }
+            }
+          }
+        }
+
         const { error } = await supabase.from(map.table).delete().eq('id', id);
         if (!error) {
           if (map.key === "deleteBill" && id === editingBillId) resetBillForm();
