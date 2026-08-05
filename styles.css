@@ -356,7 +356,7 @@ select {
   border: 0;
   font-weight: 700;
   font-size: 16px;
-  color: var(--ink);
+  color: #f4f8ff;
   outline: none;
   cursor: pointer;
   background: transparent;
@@ -384,19 +384,26 @@ select {
   font-family: "Manrope", "Segoe UI", Arial, sans-serif;
   font-size: 15px;
   font-weight: 600;
-  padding: 10px 12px;
+  padding: 11px 12px 11px 18px;
   line-height: 1.45;
-  border-bottom: 1px solid rgba(123, 197, 243, 0.22);
+  text-indent: 4px;
   background: #122238;
   color: #e8edf3;
 }
 
-#monthSelector option:last-child {
-  border-bottom: 0;
+#monthSelector option + option {
+  border-top: 1px solid rgba(123, 197, 243, 0.28);
 }
 
 #monthSelector option:checked {
   background: #2f75a8;
+  color: #fff;
+}
+
+#monthSelector option:hover,
+#monthSelector option:focus,
+#monthSelector option:active {
+  background: #245f8a;
   color: #fff;
 }
 
@@ -876,6 +883,39 @@ td {
   .month-pill {
     position: relative;
     z-index: 10;
+    border-color: #3d6388;
+    background: linear-gradient(180deg, #1a3552 0%, #142c45 100%);
+  }
+
+  .month-pill:focus-within {
+    border-color: #7bc5f3;
+    box-shadow: 0 0 0 2px rgba(123, 197, 243, 0.2), 0 10px 22px rgba(0, 0, 0, 0.28);
+  }
+
+  .month-pill::after {
+    border-right-color: #cfe8ff;
+    border-bottom-color: #cfe8ff;
+  }
+
+  .month-select {
+    color: #f4f8ff;
+  }
+
+  #monthSelector option {
+    background: #142c45;
+    color: #eaf2fb;
+  }
+
+  #monthSelector option:checked {
+    background: #2f75a8;
+    color: #fff;
+  }
+
+  #monthSelector option:hover,
+  #monthSelector option:focus,
+  #monthSelector option:active {
+    background: #245f8a;
+    color: #fff;
   }
 
   .nav-tabs {
