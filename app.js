@@ -594,25 +594,27 @@ function totals() {
     .filter((registro) => yearMonth(registro.data) === selectedMonth)
     .reduce((sum, registro) => sum + toFiniteNumber(registro.uber) + toFiniteNumber(registro.noventa_nove), 0);
   const entradas = entradasLancamentos + entradasMotorista;
+  const entradasDashboard = monthlyEntries.filter((entry) => entry.type === "Entrada" && !entry.hide_from_dashboard).reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0) + entradasMotorista;
   const saidas = monthlyEntries.filter((entry) => entry.type === "Saída").reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
-  
+
   // Reserva do mês: lançamentos de Reserva + movimentos de reserva do mês
   const reservaLancamentosMes = monthlyEntries.filter((entry) => entry.type === "Reserva").reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
   const reservaMovimentosMes = state.reserve.filter((item) => yearMonth(item.date) === selectedMonth).reduce((sum, item) => sum + (item.type === "Entrada" ? toFiniteNumber(item.amount) : -toFiniteNumber(item.amount)), 0);
   const reservaMes = reservaLancamentosMes + reservaMovimentosMes;
-  
+
   // Reserva acumulada (todos os tempos)
   const allPaidEntries = state.entries.filter((entry) => entry.paid);
   const reservaLancamentosAcumulado = allPaidEntries.filter((entry) => entry.type === "Reserva").reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
   const reservaMovimentosAcumulado = state.reserve.reduce((sum, item) => sum + (item.type === "Entrada" ? toFiniteNumber(item.amount) : -toFiniteNumber(item.amount)), 0);
   const reservaAcumulada = reservaLancamentosAcumulado + reservaMovimentosAcumulado;
 
-  return { 
-    entradas, 
-    saidas, 
-    reserva: reservaAcumulada, // total acumulado na reserva
-    reservaMes, // total movimentado na reserva neste mês
-    saldo: entradas - saidas - reservaMes 
+  return {
+    entradas,
+    entradasDashboard,
+    saidas,
+    reserva: reservaAcumulada,
+    reservaMes,
+    saldo: entradas - saidas - reservaMes
   };
 }
 
@@ -650,7 +652,7 @@ function renderHistoryChart(total) {
       labels: ["Entradas", "Saídas", "Reserva"],
       datasets: [{
         label: "Valor",
-        data: [total.entradas, total.saidas, total.reservaMes],
+        data: [total.entradasDashboard, total.saidas, total.reservaMes],
         backgroundColor: ["#2f75a8", "#c45252", "#c89f37"],
         maxBarThickness: 60,
         categoryPercentage: 0.5,
@@ -686,7 +688,7 @@ function renderComparisonChart() {
   const months = getRecentMonths(selectedMonth, 3);
   const labels = months.map(monthLabelShort);
   const entradas = months.map((month) => state.entries
-    .filter((entry) => entry.date.startsWith(month) && entry.type === "Entrada")
+    .filter((entry) => entry.date.startsWith(month) && entry.type === "Entrada" && !entry.hide_from_dashboard)
     .reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0));
   const saidas = months.map((month) => state.entries
     .filter((entry) => entry.date.startsWith(month) && entry.type === "Saída")
@@ -741,7 +743,7 @@ function renderComparisonChart() {
 
 function renderDashboard() {
   const total = totals();
-  document.querySelector("#totalEntradas").textContent = money(total.entradas);
+  document.querySelector("#totalEntradas").textContent = money(total.entradasDashboard);
   document.querySelector("#totalSaidas").textContent = money(total.saidas);
   document.querySelector("#totalReserva").textContent = money(total.reserva);
   document.querySelector("#saldoAtual").textContent = money(total.saldo);
@@ -968,7 +970,8 @@ async function loadData() {
       ...e,
       amount: Number(e.amount),
       fuel_value_remaining: Number(e.fuel_value_remaining || 0),
-      fuel_closed: !!e.fuel_closed
+      fuel_closed: !!e.fuel_closed,
+      hide_from_dashboard: !!e.hide_from_dashboard
     }));
 
     const openTanks = state.entries.filter(e => e.category === "Abastecimento" && !e.fuel_closed);
@@ -1276,6 +1279,7 @@ if (lancamentoForm) {
       amount: normalizeAmount(data.amount),
       paid: event.currentTarget.paid.checked,
       is_essential: event.currentTarget.isEssential?.checked || false,
+      hide_from_dashboard: event.currentTarget.hideFromDashboard?.checked || false,
       note: existingEntry ? (existingEntry.note || "") : "",
     };
 
