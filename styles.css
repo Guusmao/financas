@@ -1320,6 +1320,27 @@ td {
 }
 
 /* ==========================================================
+   Alert Banner (avisos persistentes no topo)
+   ========================================================== */
+.alert-banner {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  background: #ffa500;
+  color: #000;
+  font-size: 14px;
+  font-weight: 500;
+  position: sticky;
+  top: 60px;
+  z-index: 14;
+  border-bottom: 1px solid #ff8c00;
+}
+
+.alert-banner span {
+  margin: 0 auto;
+}
+
+/* ==========================================================
    Toasts (mensagens de sucesso/erro/info)
    Antes esta classe não tinha nenhum estilo: a mensagem existia
    no HTML mas era invisível (sem posição, sem cor, sem fundo).

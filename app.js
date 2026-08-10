@@ -134,6 +134,44 @@ function showModal(title, desc, confirmCallback, cancelCallback = null) {
   modal.classList.remove("hidden");
 }
 
+function normalizeForComparison(text) {
+  return String(text || "").trim().toLowerCase();
+}
+
+function findDuplicateEntry(entry, existingEntries) {
+  return existingEntries.find(existing =>
+    existing.date === entry.date &&
+    existing.type === entry.type &&
+    existing.category === entry.category &&
+    normalizeForComparison(existing.description) === normalizeForComparison(entry.description) &&
+    existing.amount === entry.amount
+  );
+}
+
+function detectMonthlyDuplicates(month) {
+  const entriesInMonth = state.entries.filter(e => e.date.startsWith(month));
+  const duplicates = [];
+
+  for (let i = 0; i < entriesInMonth.length; i++) {
+    for (let j = i + 1; j < entriesInMonth.length; j++) {
+      const a = entriesInMonth[i];
+      const b = entriesInMonth[j];
+      if (
+        a.date === b.date &&
+        a.type === b.type &&
+        a.category === b.category &&
+        normalizeForComparison(a.description) === normalizeForComparison(b.description) &&
+        a.amount === b.amount
+      ) {
+        if (!duplicates.find(dup => dup.id === a.id)) duplicates.push(a);
+        if (!duplicates.find(dup => dup.id === b.id)) duplicates.push(b);
+      }
+    }
+  }
+
+  return duplicates;
+}
+
 
 function dateLabel(date) {
   if (!date) return "";
@@ -450,7 +488,8 @@ async function ensureInstallmentsForMonth() {
 }
 
 function fillSelect(select, options) {
-  select.innerHTML = options.map((item) => `<option>${item}</option>`).join("");
+  select.innerHTML = `<option value="" disabled selected>Selecione uma categoria</option>` +
+    options.map((item) => `<option>${item}</option>`).join("");
 }
 
 function setupMoneyInputs() {
@@ -743,6 +782,18 @@ function renderComparisonChart() {
   });
 }
 
+function renderDuplicatesBanner() {
+  const duplicates = detectMonthlyDuplicates(selectedMonth);
+  const banner = document.querySelector("#duplicates-banner");
+  if (!banner) return;
+
+  if (duplicates.length > 0) {
+    banner.style.display = "flex";
+  } else {
+    banner.style.display = "none";
+  }
+}
+
 function renderDashboard() {
   const total = totals();
   document.querySelector("#totalEntradas").textContent = money(total.entradasDashboard);
@@ -931,6 +982,7 @@ function switchTab(tabId) {
 }
 
 function render() {
+  renderDuplicatesBanner();
   renderDashboard();
   renderEntries();
   renderBills();
@@ -1264,8 +1316,14 @@ if (lancamentoForm) {
   lancamentoForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     if (!supabase || !user) return;
-    
+
     const data = formData(event.currentTarget);
+
+    if (!data.category || data.category === "") {
+      showToast("Por favor, selecione uma categoria", "error");
+      return;
+    }
+
     const allowedTypes = ["Entrada", "Saída", "Reserva"];
     const type = allowedTypes.includes(data.type) ? data.type : "Saída";
     const category = config.categories.includes(data.category) ? data.category : "Outros";
@@ -1304,7 +1362,58 @@ if (lancamentoForm) {
         entry.fuel_closed = existingEntry ? existingEntry.fuel_closed : false;
       }
     }
-    
+
+    if (!editingEntryId) {
+      const duplicate = findDuplicateEntry(entry, state.entries);
+      if (duplicate) {
+        const modal = document.querySelector("#custom-modal");
+        modal.querySelector("#modal-title").textContent = "Lançamento Duplicado";
+        modal.querySelector("#modal-desc").textContent = `Já existe um lançamento idêntico em ${dateLabel(duplicate.date)}. Deseja salvar mesmo assim?`;
+        const confirmBtn = modal.querySelector("#modal-confirm");
+        const cancelBtn = modal.querySelector("#modal-cancel");
+
+        confirmBtn.textContent = "Salvar mesmo assim";
+        cancelBtn.textContent = "Cancelar";
+
+        confirmBtn.onclick = async () => {
+          modal.classList.add("hidden");
+          await submitForm();
+        };
+        cancelBtn.onclick = () => {
+          modal.classList.add("hidden");
+        };
+
+        modal.classList.remove("hidden");
+        return;
+      }
+    }
+
+    if (!editingEntryId && type === "Saída" && category === "Salário") {
+      const modal = document.querySelector("#custom-modal");
+      modal.querySelector("#modal-title").textContent = "Confirmar Categoria";
+      modal.querySelector("#modal-desc").textContent = "Você marcou este gasto como categoria Salário — tem certeza?";
+      const confirmBtn = modal.querySelector("#modal-confirm");
+      const cancelBtn = modal.querySelector("#modal-cancel");
+
+      confirmBtn.textContent = "Salvar mesmo assim";
+      cancelBtn.textContent = "Corrigir categoria";
+
+      confirmBtn.onclick = async () => {
+        modal.classList.add("hidden");
+        await submitForm();
+      };
+      cancelBtn.onclick = () => {
+        modal.classList.add("hidden");
+      };
+
+      modal.classList.remove("hidden");
+      return;
+    }
+
+    await submitForm();
+
+    async function submitForm() {
+
     const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
 
@@ -1404,6 +1513,8 @@ if (lancamentoForm) {
         showToast(`${money(entry.amount)} debitado automaticamente da Reserva.`, "info");
       }
     }
+
+    } // fim submitForm
 
     resetEntryForm();
   });
