@@ -595,7 +595,8 @@ function totals() {
     .reduce((sum, registro) => sum + toFiniteNumber(registro.uber) + toFiniteNumber(registro.noventa_nove), 0);
   const entradas = entradasLancamentos + entradasMotorista;
   const entradasDashboard = monthlyEntries.filter((entry) => entry.type === "Entrada" && !entry.hide_from_dashboard).reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0) + entradasMotorista;
-  const saidas = monthlyEntries.filter((entry) => entry.type === "Saída").reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
+  const saidas = monthlyEntries.filter((entry) => entry.type === "Saída" && !entry.is_internal_transfer).reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
+  const saidasDashboard = monthlyEntries.filter((entry) => entry.type === "Saída" && !entry.hide_from_dashboard && !entry.is_internal_transfer).reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
 
   // Reserva do mês: lançamentos de Reserva + movimentos de reserva do mês
   const reservaLancamentosMes = monthlyEntries.filter((entry) => entry.type === "Reserva").reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
@@ -612,6 +613,7 @@ function totals() {
     entradas,
     entradasDashboard,
     saidas,
+    saidasDashboard,
     reserva: reservaAcumulada,
     reservaMes,
     saldo: entradas - saidas - reservaMes
@@ -652,7 +654,7 @@ function renderHistoryChart(total) {
       labels: ["Entradas", "Saídas", "Reserva"],
       datasets: [{
         label: "Valor",
-        data: [total.entradasDashboard, total.saidas, total.reservaMes],
+        data: [total.entradasDashboard, total.saidasDashboard, total.reservaMes],
         backgroundColor: ["#2f75a8", "#c45252", "#c89f37"],
         maxBarThickness: 60,
         categoryPercentage: 0.5,
@@ -691,7 +693,7 @@ function renderComparisonChart() {
     .filter((entry) => entry.date.startsWith(month) && entry.type === "Entrada" && !entry.hide_from_dashboard)
     .reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0));
   const saidas = months.map((month) => state.entries
-    .filter((entry) => entry.date.startsWith(month) && entry.type === "Saída")
+    .filter((entry) => entry.date.startsWith(month) && entry.type === "Saída" && !entry.hide_from_dashboard && !entry.is_internal_transfer)
     .reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0));
 
   if (comparisonChartInstance) {
@@ -744,7 +746,7 @@ function renderComparisonChart() {
 function renderDashboard() {
   const total = totals();
   document.querySelector("#totalEntradas").textContent = money(total.entradasDashboard);
-  document.querySelector("#totalSaidas").textContent = money(total.saidas);
+  document.querySelector("#totalSaidas").textContent = money(total.saidasDashboard);
   document.querySelector("#totalReserva").textContent = money(total.reserva);
   document.querySelector("#saldoAtual").textContent = money(total.saldo);
   document.querySelector("#todayLabel").textContent = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
@@ -971,7 +973,8 @@ async function loadData() {
       amount: Number(e.amount),
       fuel_value_remaining: Number(e.fuel_value_remaining || 0),
       fuel_closed: !!e.fuel_closed,
-      hide_from_dashboard: !!e.hide_from_dashboard
+      hide_from_dashboard: !!e.hide_from_dashboard,
+      is_internal_transfer: !!e.is_internal_transfer
     }));
 
     const openTanks = state.entries.filter(e => e.category === "Abastecimento" && !e.fuel_closed);
@@ -1339,6 +1342,7 @@ if (lancamentoForm) {
             amount: normalizeAmount(form.querySelector("#fuel-modal-val-input").value),
             paid: true,
             is_essential: false,
+            is_internal_transfer: true,
             note: ""
           };
           
