@@ -964,12 +964,18 @@ async function loadData() {
     if (reserveRes.error) throw reserveRes.error;
     if (motoristaRes.error) throw motoristaRes.error;
 
-    state.entries = (entriesRes.data || []).map(e => ({ 
-      ...e, 
+    state.entries = (entriesRes.data || []).map(e => ({
+      ...e,
       amount: Number(e.amount),
       fuel_value_remaining: Number(e.fuel_value_remaining || 0),
       fuel_closed: !!e.fuel_closed
     }));
+
+    const openTanks = state.entries.filter(e => e.category === "Abastecimento" && !e.fuel_closed);
+    if (openTanks.length > 1) {
+      showToast(`⚠️ Atenção: encontrados ${openTanks.length} abastecimentos em aberto simultaneamente. Revise seus lançamentos.`, "warning");
+    }
+
     state.bills = (billsRes.data || []).map(b => ({
       id: b.id,
       name: b.name,
@@ -1277,14 +1283,27 @@ if (lancamentoForm) {
     // caso a migration supabase/migrations/add_fuel_columns.sql ainda não
     // tenha sido executada no banco (essas colunas precisam existir na tabela "entries").
     if (isAbastecimento || existingEntry) {
-      entry.fuel_value_remaining = (isAbastecimento && !editingEntryId) ? normalizeAmount(data.amount) : (existingEntry ? existingEntry.fuel_value_remaining : null);
-      entry.fuel_closed = existingEntry ? existingEntry.fuel_closed : false;
+      const categoriaMudouPara = existingEntry && existingEntry.category !== "Abastecimento" && isAbastecimento;
+      const categoriaMudouDe = existingEntry && existingEntry.category === "Abastecimento" && !isAbastecimento;
+
+      if (categoriaMudouPara) {
+        entry.fuel_value_remaining = normalizeAmount(data.amount);
+        entry.fuel_closed = false;
+      } else if (categoriaMudouDe) {
+        entry.fuel_value_remaining = existingEntry.fuel_value_remaining;
+        entry.fuel_closed = true;
+      } else {
+        entry.fuel_value_remaining = (isAbastecimento && !editingEntryId) ? normalizeAmount(data.amount) : (existingEntry ? existingEntry.fuel_value_remaining : null);
+        entry.fuel_closed = existingEntry ? existingEntry.fuel_closed : false;
+      }
     }
     
     const submitBtn = event.currentTarget.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
 
-    if (isAbastecimento && !editingEntryId) {
+    const isNewAbastecimento = isAbastecimento && (!editingEntryId || (editingEntryId && existingEntry && existingEntry.category !== "Abastecimento"));
+
+    if (isNewAbastecimento) {
       const openTank = state.entries.find(e => e.type === "Saída" && e.category === "Abastecimento" && !e.fuel_closed);
       if (openTank && openTank.fuel_value_remaining > 0) {
         const modal = document.querySelector("#fuel-modal");
