@@ -26,12 +26,38 @@ function resumoRegistro(registro) {
   return { combustivel, bruto, liquido };
 }
 
-function weekRangeLabel(selectedMonth, weekIndex) {
-  const [year, month] = selectedMonth.split("-").map(Number);
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const startDay = (weekIndex - 1) * 7 + 1;
-  const endDay = Math.min(startDay + 6, daysInMonth);
-  return `Semana ${weekIndex} (${String(startDay).padStart(2, "0")} a ${String(endDay).padStart(2, "0")})`;
+function getWeekKey(dateString) {
+  const [year, month, day] = dateString.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  const dayOfWeek = date.getDay();
+
+  const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+  const monday = new Date(date);
+  monday.setDate(monday.getDate() - daysToMonday);
+
+  return monday.toISOString().split('T')[0];
+}
+
+function weekRangeLabel(mondayDateString, selectedMonth) {
+  const [year, month, day] = mondayDateString.split("-").map(Number);
+  const monday = new Date(year, month - 1, day);
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+
+  const [selectedYear, selectedMonthNum] = selectedMonth.split("-").map(Number);
+
+  let startDay = monday.getDate();
+  if (monday.getFullYear() !== selectedYear || monday.getMonth() + 1 !== selectedMonthNum) {
+    startDay = 1;
+  }
+
+  let endDay = sunday.getDate();
+  if (sunday.getFullYear() !== selectedYear || sunday.getMonth() + 1 !== selectedMonthNum) {
+    const lastDay = new Date(selectedYear, selectedMonthNum, 0);
+    endDay = lastDay.getDate();
+  }
+
+  return `Semana ${String(startDay).padStart(2, "0")} a ${String(endDay).padStart(2, "0")}`;
 }
 
 function renderGanhosSemanais(registrosMes, selectedMonth, money) {
@@ -41,12 +67,9 @@ function renderGanhosSemanais(registrosMes, selectedMonth, money) {
   const weeklyTotals = new Map();
 
   registrosMes.forEach((registro) => {
-    const day = Number(String(registro.data || "").slice(8, 10));
-    if (!Number.isFinite(day) || day <= 0) return;
-
-    const weekIndex = Math.floor((day - 1) / 7) + 1;
-    if (!weeklyTotals.has(weekIndex)) {
-      weeklyTotals.set(weekIndex, {
+    const weekKey = getWeekKey(registro.data);
+    if (!weeklyTotals.has(weekKey)) {
+      weeklyTotals.set(weekKey, {
         bruto: 0,
         combustivel: 0,
         liquido: 0,
@@ -54,7 +77,7 @@ function renderGanhosSemanais(registrosMes, selectedMonth, money) {
       });
     }
 
-    const summary = weeklyTotals.get(weekIndex);
+    const summary = weeklyTotals.get(weekKey);
     const { combustivel, bruto, liquido } = resumoRegistro(registro);
     summary.bruto += bruto;
     summary.combustivel += combustivel;
@@ -62,20 +85,20 @@ function renderGanhosSemanais(registrosMes, selectedMonth, money) {
     summary.dias += 1;
   });
 
-  const weekIndexes = Array.from(weeklyTotals.keys()).sort((a, b) => a - b);
+  const weekKeys = Array.from(weeklyTotals.keys()).sort();
 
-  if (!weekIndexes.length) {
+  if (!weekKeys.length) {
     list.innerHTML = `<div class="list-row"><div><strong>Sem registros no mês</strong><small>Adicione corridas para ver o resumo semanal.</small></div></div>`;
     return;
   }
 
-  list.innerHTML = weekIndexes
-    .map((weekIndex) => {
-      const week = weeklyTotals.get(weekIndex);
+  list.innerHTML = weekKeys
+    .map((weekKey) => {
+      const week = weeklyTotals.get(weekKey);
       return `
         <div class="list-row">
           <div>
-            <strong>${weekRangeLabel(selectedMonth, weekIndex)}</strong>
+            <strong>${weekRangeLabel(weekKey, selectedMonth)}</strong>
             <small>${week.dias} dia(s) trabalhado(s)</small>
           </div>
           <div>
