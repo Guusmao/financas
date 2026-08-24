@@ -1421,56 +1421,7 @@ if (lancamentoForm) {
 
     if (isNewAbastecimento) {
       const openTank = state.entries.find(e => e.type === "Saída" && e.category === "Abastecimento" && !e.fuel_closed);
-      if (openTank && openTank.fuel_value_remaining > 0) {
-        const modal = document.querySelector("#fuel-modal");
-        modal.querySelector("#fuel-modal-remaining").textContent = money(openTank.fuel_value_remaining);
-        modal.querySelector("#fuel-modal-date").textContent = `Do abastecimento de ${dateLabel(openTank.date)}`;
-        
-        const form = document.querySelector("#fuel-modal-form");
-        form.querySelector("#fuel-modal-date-input").value = todayIso();
-        form.querySelector("#fuel-modal-desc-input").value = `Uso pessoal - sobra do abastecimento de ${dateLabel(openTank.date)}`;
-        form.querySelector("#fuel-modal-val-input").value = String(openTank.fuel_value_remaining);
-        
-        modal.classList.remove("hidden");
-        
-        document.querySelector("#fuel-modal-cancel").onclick = () => {
-          modal.classList.add("hidden");
-          submitBtn.disabled = false;
-        };
-        
-        form.onsubmit = async (e) => {
-          e.preventDefault();
-          modal.classList.add("hidden");
-          const usoPessoalData = {
-            user_id: user.id,
-            date: form.querySelector("#fuel-modal-date-input").value,
-            type: "Saída",
-            category: "Abastecimento",
-            description: form.querySelector("#fuel-modal-desc-input").value,
-            payment: "PIX",
-            amount: normalizeAmount(form.querySelector("#fuel-modal-val-input").value),
-            paid: true,
-            is_essential: false,
-            is_internal_transfer: true,
-            note: ""
-          };
-          
-          await supabase.from('entries').insert(usoPessoalData);
-          await supabase.from('entries').update({ fuel_closed: true }).eq('id', openTank.id);
-          
-          showToast(`Gasto de uso pessoal de ${money(usoPessoalData.amount)} lançado.`, "info");
-          
-          const { data: saved, error } = await supabase.from('entries').insert(entry).select().single();
-          submitBtn.disabled = false;
-          if (error) {
-            showToast("Erro ao salvar abastecimento: " + error.message, "error");
-            return;
-          }
-          await loadData();
-          resetEntryForm();
-        };
-        return; 
-      } else if (openTank) {
+      if (openTank) {
         await supabase.from('entries').update({ fuel_closed: true }).eq('id', openTank.id);
       }
     }
