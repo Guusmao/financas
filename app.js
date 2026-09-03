@@ -2,6 +2,12 @@ import {
   renderMotorista
 } from "./motorista.js";
 
+import {
+  renderBancos,
+  loadPluggyItems,
+  disconnectBank
+} from "./pluggy.js";
+
 import { createClient } from '@supabase/supabase-js';
 
 const config = {
@@ -46,6 +52,7 @@ let state = {
   goals: [],
   reserve: [],
   motorista: [],
+  pluggyItems: [],
 };
 
 let user = null;
@@ -981,6 +988,21 @@ function switchTab(tabId) {
   if (targetButton) targetButton.classList.add("active");
 }
 
+async function disconnectBankHandler(itemId) {
+  if (!supabase) {
+    showToast("Erro: Não autenticado", "error");
+    return;
+  }
+
+  showModal("Desconectar banco", "Tem certeza que deseja desconectar este banco? Os lançamentos já sincronizados serão mantidos.", async () => {
+    const success = await disconnectBank(supabase, itemId, showToast);
+    if (success) {
+      await loadData();
+      render();
+    }
+  });
+}
+
 function render() {
   renderDuplicatesBanner();
   renderDashboard();
@@ -989,6 +1011,13 @@ function render() {
   renderGoals();
   renderReserve();
   renderMotorista(state.motorista, selectedMonth, money, dateLabel);
+  renderBancos(
+    state.pluggyItems,
+    money,
+    dateLabel,
+    showToast,
+    (itemId) => disconnectBankHandler(itemId)
+  );
   updateDriverEstimates();
 }
 
@@ -1005,13 +1034,15 @@ async function loadData() {
       billsRes,
       goalsRes,
       reserveRes,
-      motoristaRes
+      motoristaRes,
+      pluggyItemsRes
     ] = await Promise.all([
       supabase.from("entries").select("*").order("date", { ascending: false }),
       supabase.from("bills").select("*").order("due_day", { ascending: true }),
       supabase.from("goals").select("*").order("name", { ascending: true }),
       supabase.from("reserve").select("*").order("date", { ascending: false }),
-      supabase.from("motorista_registros").select("*").order("data", { ascending: false })
+      supabase.from("motorista_registros").select("*").order("data", { ascending: false }),
+      supabase.from("pluggy_items").select("*").order("created_at", { ascending: false })
     ]);
 
     if (entriesRes.error) throw entriesRes.error;
@@ -1019,6 +1050,7 @@ async function loadData() {
     if (goalsRes.error) throw goalsRes.error;
     if (reserveRes.error) throw reserveRes.error;
     if (motoristaRes.error) throw motoristaRes.error;
+    if (pluggyItemsRes.error) throw pluggyItemsRes.error;
 
     state.entries = (entriesRes.data || []).map(e => ({
       ...e,
@@ -1054,6 +1086,8 @@ async function loadData() {
       consumo_veiculo: Number(item.consumo_veiculo),
       tank_entry_id: item.tank_entry_id || null,
     }));
+
+    state.pluggyItems = (pluggyItemsRes.data || []);
 
     await ensureInstallmentsForMonth();
 
@@ -1894,6 +1928,12 @@ document.body.addEventListener("click", async (event) => {
 
     button.disabled = false;
     render();
+    return;
+  }
+
+  const disconnectItemId = button.dataset.disconnectItem;
+  if (disconnectItemId) {
+    await disconnectBankHandler(disconnectItemId);
     return;
   }
 

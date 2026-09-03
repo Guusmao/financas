@@ -145,6 +145,87 @@ Se você for abrir o projeto com **Go Live**, o `.env` não é processado. Nesse
 
 ---
 
+## 🏦 Open Finance (Pluggy)
+
+Esta aplicação integra com o **Pluggy** para sincronizar automaticamente transações bancárias de contas já conectadas via [Meu Pluggy](https://meu.pluggy.ai).
+
+### Configuração Inicial
+
+#### 1. Pré-requisitos
+- Contas bancárias já conectadas em [Meu Pluggy](https://meu.pluggy.ai).
+- Credenciais da Pluggy (CLIENT_ID e CLIENT_SECRET) disponíveis no [Dashboard Pluggy](https://dashboard.pluggy.ai).
+- Acesso de administrador ao Supabase para executar migrations.
+
+#### 2. Configurar Variáveis de Ambiente no Vercel
+
+Adicione as seguintes variáveis de ambiente (servidor, **sem prefixo `VITE_`**):
+
+```env
+# Pluggy API
+PLUGGY_CLIENT_ID=seu-client-id
+PLUGGY_CLIENT_SECRET=seu-client-secret
+
+# Supabase Admin (para sincronização no servidor)
+SUPABASE_SERVICE_ROLE_KEY=sua-service-role-key
+
+# App Owner
+APP_OWNER_USER_ID=seu-user-id-do-supabase
+
+# Secrets
+SETUP_SECRET=um-secret-aleatório-seguro
+PLUGGY_WEBHOOK_SECRET=outro-secret-aleatório-seguro
+
+# URLs
+APP_URL=https://seu-dominio-de-produção.vercel.app
+PLUGGY_SYNC_FROM_DATE=2024-01-01
+```
+
+> **Importante**: Nunca coloque `PLUGGY_CLIENT_SECRET` ou `SUPABASE_SERVICE_ROLE_KEY` no frontend. Eles existem apenas em variáveis de ambiente do servidor.
+
+#### 3. Executar Migrations no Supabase
+
+No SQL Editor do Supabase, execute:
+
+```sql
+-- Copie e execute o conteúdo de supabase/migrations/20260826_add_pluggy_integration.sql
+```
+
+#### 4. Configurar Webhook (Uma única vez, após deploy)
+
+Faça uma requisição POST para registrar o webhook na Pluggy:
+
+```bash
+curl -X POST https://seu-dominio.vercel.app/api/pluggy/setup-webhook \
+  -H "X-Setup-Secret: seu-SETUP_SECRET"
+```
+
+#### 5. Sincronizar Histórico Inicial (Uma única vez)
+
+Faça uma requisição POST para sincronizar transações anteriores:
+
+```bash
+curl -X POST https://seu-dominio.vercel.app/api/pluggy/bootstrap \
+  -H "X-Setup-Secret: seu-SETUP_SECRET"
+```
+
+Após isso, os webhooks da Pluggy dispararão automaticamente quando houver novos lançamentos.
+
+### Como Funciona
+
+1. **Sincronização Automática**: A Pluggy dispara um webhook quando detecta novas transações em suas contas conectadas.
+2. **Mapeamento de Categorias**: Transações são automaticamente categorizadas conforme o mapa em `api/pluggy/_utils.js`.
+3. **Transferências Internas**: Transações entre suas próprias contas são marcadas como `is_internal_transfer` e não inflamam o saldo.
+4. **Aba "Bancos"**: Você pode visualizar quais bancos estão conectados e desconectar quando necessário.
+
+### Endpoints Internos
+
+- **POST `/api/pluggy/webhook`**: Recebe disparos automáticos da Pluggy (requer `?secret=`).
+- **POST `/api/pluggy/setup-webhook`**: Registra o webhook na Pluggy (requer header `X-Setup-Secret`).
+- **POST `/api/pluggy/bootstrap`**: Sincroniza histórico inicial (requer header `X-Setup-Secret`).
+- **POST `/api/pluggy/disconnect`**: Desconecta um banco (autenticado, remove item mas mantém lançamentos).
+
+---
+
 ## 📦 Deploy na Vercel
 
 1. Suba o projeto para o seu **GitHub**.
