@@ -799,7 +799,6 @@ function renderDashboard() {
   document.querySelector("#totalEntradas").textContent = money(total.entradasDashboard);
   document.querySelector("#totalSaidas").textContent = money(total.saidasDashboard);
   document.querySelector("#totalReserva").textContent = money(total.reserva);
-  document.querySelector("#saldoAtual").textContent = money(total.saldo);
   document.querySelector("#todayLabel").textContent = new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" });
 
   // Contas fixas pagas/pendentes baseadas apenas no mês selecionado
