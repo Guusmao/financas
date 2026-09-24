@@ -2,12 +2,6 @@ import {
   renderMotorista
 } from "./motorista.js";
 
-import {
-  renderBancos,
-  loadPluggyItems,
-  disconnectBank
-} from "./pluggy.js";
-
 import { createClient } from '@supabase/supabase-js';
 
 const config = {
@@ -52,7 +46,6 @@ let state = {
   goals: [],
   reserve: [],
   motorista: [],
-  pluggyItems: [],
 };
 
 let user = null;
@@ -822,23 +815,11 @@ function renderDashboard() {
     return { bill, status };
   });
 
-  const billsPaidCount = billsWithStatus.filter((item) => item.status.key === "paid").length;
-  const billsOverdueCount = billsWithStatus.filter((item) => item.status.key === "overdue").length;
-  const otherExpensesTotal = state.entries
-    .filter((entry) => entry.type === "Saída" && yearMonth(entry.date) === selectedMonth)
-    .filter((entry) => !String(entry.note || "").toLowerCase().includes("conta fixa"))
-    .reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
   const driverIncomeTotal = state.motorista
     .filter((registro) => yearMonth(registro.data) === selectedMonth)
     .reduce((sum, registro) => sum + toFiniteNumber(registro.uber) + toFiniteNumber(registro.noventa_nove), 0);
 
-  const kpiBillsPaid = document.querySelector("#kpiBillsPaid");
-  const kpiBillsOverdue = document.querySelector("#kpiBillsOverdue");
-  const kpiOtherExpenses = document.querySelector("#kpiOtherExpenses");
   const kpiDriverIncome = document.querySelector("#kpiDriverIncome");
-  if (kpiBillsPaid) kpiBillsPaid.textContent = String(billsPaidCount);
-  if (kpiBillsOverdue) kpiBillsOverdue.textContent = String(billsOverdueCount);
-  if (kpiOtherExpenses) kpiOtherExpenses.textContent = money(otherExpensesTotal);
   if (kpiDriverIncome) kpiDriverIncome.textContent = money(driverIncomeTotal);
 
   const visibleBills = showOnlyUnpaidBills ? billsWithStatus.filter((item) => item.status.key !== "paid") : billsWithStatus;
@@ -850,19 +831,6 @@ function renderDashboard() {
       <div><span class="amount">${money(bill.amount)}</span><span class="status ${status.className}">${status.label}</span></div>
     </div>`;
   }).join("") || emptyRow(showOnlyUnpaidBills ? "Nenhuma conta não paga" : "Nenhuma conta fixa");
-
-  // Gastos do mês selecionado
-  const gastos = state.entries
-    .filter((entry) => entry.type === "Saída" && entry.date.startsWith(selectedMonth))
-    .filter((entry) => !String(entry.note || "").toLowerCase().includes("conta fixa"))
-    .slice()
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 6);
-  document.querySelector("#gastosStatus").textContent = `${gastos.length} recentes`;
-  document.querySelector("#dashboardGastos").innerHTML = gastos.map((entry) => `<div class="list-row">
-    <div><strong>${escapeHtml(entry.description)}</strong><small>${dateLabel(entry.date)} · ${escapeHtml(entry.category)} · ${escapeHtml(entry.payment)}</small></div>
-    <span class="amount">${money(entry.amount)}</span>
-  </div>`).join("") || emptyRow("Nenhum gasto lançado");
 
   document.querySelector("#metasStatus").textContent = `${state.goals.length} metas`;
   document.querySelector("#dashboardMetas").innerHTML = state.goals.map(goalCard).join("") || emptyRow("Nenhuma meta cadastrada");
@@ -899,44 +867,6 @@ function goalCard(goal) {
       <button class="row-action" data-delete-goal="${goal.id}" type="button">Excluir</button>
     </div>
   </div>`;
-}
-
-function renderEntries() {
-  const lancamentosTable = document.querySelector("#lancamentosTable");
-  if (!lancamentosTable) return;
-
-  const monthEntries = state.entries
-    .filter((entry) => entry.date.startsWith(selectedMonth))
-    .filter((entry) => !String(entry.note || "").toLowerCase().includes("conta fixa"));
-
-  const sumEntrada = monthEntries.filter(e => e.type === "Entrada").reduce((a,b) => a + toFiniteNumber(b.amount), 0);
-  const sumSaida = monthEntries.filter(e => e.type === "Saída").reduce((a,b) => a + toFiniteNumber(b.amount), 0);
-  const sumEssencial = monthEntries.filter(e => e.is_essential).reduce((a,b) => a + toFiniteNumber(b.amount), 0);
-
-  const lte = document.querySelector("#lancamentosTotalEntrada");
-  if(lte) lte.textContent = money(sumEntrada);
-  const lts = document.querySelector("#lancamentosTotalSaida");
-  if(lts) lts.textContent = money(sumSaida);
-  const ltes = document.querySelector("#lancamentosTotalEssencial");
-  if(ltes) ltes.textContent = money(sumEssencial);
-
-  const rows = monthEntries
-    .slice()
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .map((entry) => `<tr>
-    <td>${dateLabel(entry.date)}</td>
-    <td><span class="badge ${entry.type}">${escapeHtml(entry.type)}</span></td>
-    <td>${escapeHtml(entry.category)}</td>
-    <td>${escapeHtml(entry.description)} ${entry.is_essential ? '<span class="badge essential">Essencial</span>' : ''}</td>
-    <td>${escapeHtml(entry.payment)}</td>
-    <td>${money(entry.amount)}</td>
-    <td>${entry.paid ? "☑" : "☐"}</td>
-    <td>
-      <button class="row-action neutral" data-edit-entry="${entry.id}" type="button">Editar</button>
-      <button class="row-action" data-delete-entry="${entry.id}" type="button">Excluir</button>
-    </td>
-  </tr>`);
-  lancamentosTable.innerHTML = rows.join("");
 }
 
 function renderBills() {
@@ -988,36 +918,13 @@ function switchTab(tabId) {
   if (targetButton) targetButton.classList.add("active");
 }
 
-async function disconnectBankHandler(itemId) {
-  if (!supabase) {
-    showToast("Erro: Não autenticado", "error");
-    return;
-  }
-
-  showModal("Desconectar banco", "Tem certeza que deseja desconectar este banco? Os lançamentos já sincronizados serão mantidos.", async () => {
-    const success = await disconnectBank(supabase, itemId, showToast);
-    if (success) {
-      await loadData();
-      render();
-    }
-  });
-}
-
 function render() {
   renderDuplicatesBanner();
   renderDashboard();
-  renderEntries();
   renderBills();
   renderGoals();
   renderReserve();
   renderMotorista(state.motorista, selectedMonth, money, dateLabel);
-  renderBancos(
-    state.pluggyItems,
-    money,
-    dateLabel,
-    showToast,
-    (itemId) => disconnectBankHandler(itemId)
-  );
   updateDriverEstimates();
 }
 
@@ -1034,15 +941,13 @@ async function loadData() {
       billsRes,
       goalsRes,
       reserveRes,
-      motoristaRes,
-      pluggyItemsRes
+      motoristaRes
     ] = await Promise.all([
       supabase.from("entries").select("*").order("date", { ascending: false }),
       supabase.from("bills").select("*").order("due_day", { ascending: true }),
       supabase.from("goals").select("*").order("name", { ascending: true }),
       supabase.from("reserve").select("*").order("date", { ascending: false }),
-      supabase.from("motorista_registros").select("*").order("data", { ascending: false }),
-      supabase.from("pluggy_items").select("*").order("created_at", { ascending: false })
+      supabase.from("motorista_registros").select("*").order("data", { ascending: false })
     ]);
 
     if (entriesRes.error) throw entriesRes.error;
@@ -1050,7 +955,6 @@ async function loadData() {
     if (goalsRes.error) throw goalsRes.error;
     if (reserveRes.error) throw reserveRes.error;
     if (motoristaRes.error) throw motoristaRes.error;
-    if (pluggyItemsRes.error) throw pluggyItemsRes.error;
 
     state.entries = (entriesRes.data || []).map(e => ({
       ...e,
@@ -1086,8 +990,6 @@ async function loadData() {
       consumo_veiculo: Number(item.consumo_veiculo),
       tank_entry_id: item.tank_entry_id || null,
     }));
-
-    state.pluggyItems = (pluggyItemsRes.data || []);
 
     await ensureInstallmentsForMonth();
 
@@ -1928,12 +1830,6 @@ document.body.addEventListener("click", async (event) => {
 
     button.disabled = false;
     render();
-    return;
-  }
-
-  const disconnectItemId = button.dataset.disconnectItem;
-  if (disconnectItemId) {
-    await disconnectBankHandler(disconnectItemId);
     return;
   }
 
