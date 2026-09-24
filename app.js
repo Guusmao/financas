@@ -678,110 +678,6 @@ function getRecentMonths(baseMonth, count = 3) {
   return months;
 }
 
-function renderHistoryChart(total) {
-  const canvas = document.querySelector("#historyChart");
-  const ChartLib = window.Chart;
-  if (!canvas || !ChartLib) return;
-
-  if (historyChartInstance) {
-    historyChartInstance.destroy();
-  }
-
-  historyChartInstance = new ChartLib(canvas, {
-    type: "bar",
-    data: {
-      labels: ["Entradas", "Saídas", "Reserva"],
-      datasets: [{
-        label: "Valor",
-        data: [total.entradasDashboard, total.saidasDashboard, total.reservaMes],
-        backgroundColor: ["#2f75a8", "#c45252", "#c89f37"],
-        maxBarThickness: 60,
-        categoryPercentage: 0.5,
-        barPercentage: 0.6,
-        borderRadius: 8,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            callback: (value) => money(value),
-          },
-        },
-      },
-    },
-  });
-}
-
-function renderComparisonChart() {
-  const canvas = document.querySelector("#comparisonChart");
-  const label = document.querySelector("#comparisonMonthsLabel");
-  const ChartLib = window.Chart;
-  if (label) label.textContent = "Últimos 3 meses";
-  if (!canvas || !ChartLib) return;
-
-  const months = getRecentMonths(selectedMonth, 3);
-  const labels = months.map(monthLabelShort);
-  const entradas = months.map((month) => state.entries
-    .filter((entry) => entry.date.startsWith(month) && entry.type === "Entrada" && !entry.hide_from_dashboard)
-    .reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0));
-  const saidas = months.map((month) => state.entries
-    .filter((entry) => entry.date.startsWith(month) && entry.type === "Saída" && !entry.hide_from_dashboard && !entry.is_internal_transfer)
-    .reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0));
-
-  if (comparisonChartInstance) {
-    comparisonChartInstance.destroy();
-  }
-
-  comparisonChartInstance = new ChartLib(canvas, {
-    type: "line",
-    data: {
-      labels,
-      datasets: [
-        {
-          label: "Entradas",
-          data: entradas,
-          borderColor: "#2f75a8",
-          backgroundColor: "rgba(47, 117, 168, 0.2)",
-          tension: 0.3,
-          fill: false,
-        },
-        {
-          label: "Saídas",
-          data: saidas,
-          borderColor: "#c45252",
-          backgroundColor: "rgba(196, 82, 82, 0.2)",
-          tension: 0.3,
-          fill: false,
-        },
-      ],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: {
-          position: "top",
-        },
-      },
-      scales: {
-        y: {
-          beginAtZero: true,
-          ticks: {
-            callback: (value) => money(value),
-          },
-        },
-      },
-    },
-  });
-}
-
 function renderDuplicatesBanner() {
   const duplicates = detectMonthlyDuplicates(selectedMonth);
   const banner = document.querySelector("#duplicates-banner");
@@ -847,9 +743,6 @@ function renderDashboard() {
     <div><strong>${dateLabel(item.date)}</strong><small>${escapeHtml(item.note || item.type)}</small></div>
     <span class="amount">${item.type === "Saída" ? "-" : ""}${money(item.amount)}</span>
   </div>`).join("") || emptyRow("Sem movimentos");
-
-  renderHistoryChart(total);
-  renderComparisonChart();
 
 }
 
