@@ -871,20 +871,6 @@ function goalCard(goal) {
 
 function renderBills() {
   const orderedBills = sortBills(state.bills);
-
-  const billsWithStatus = orderedBills.map((bill) => {
-    const status = billStatusForMonth(bill, selectedMonth);
-    return { bill, status };
-  });
-
-  const billsPaidCount = billsWithStatus.filter((item) => item.status.key === "paid").length;
-  const billsOverdueCount = billsWithStatus.filter((item) => item.status.key === "overdue").length;
-
-  const kpiBillsPaid = document.querySelector("#billsKpiPaid");
-  const kpiBillsOverdue = document.querySelector("#billsKpiOverdue");
-  if (kpiBillsPaid) kpiBillsPaid.textContent = String(billsPaidCount);
-  if (kpiBillsOverdue) kpiBillsOverdue.textContent = String(billsOverdueCount);
-
   document.querySelector("#contasList").innerHTML = orderedBills.map((bill) => {
     const status = billStatusForMonth(bill, selectedMonth);
     const paid = status.key === "paid";
