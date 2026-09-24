@@ -815,6 +815,14 @@ function renderDashboard() {
     return { bill, status };
   });
 
+  const billsPaidCount = billsWithStatus.filter((item) => item.status.key === "paid").length;
+  const billsOverdueCount = billsWithStatus.filter((item) => item.status.key === "overdue").length;
+
+  const kpiBillsPaid = document.querySelector("#kpiBillsPaid");
+  const kpiBillsOverdue = document.querySelector("#kpiBillsOverdue");
+  if (kpiBillsPaid) kpiBillsPaid.textContent = String(billsPaidCount);
+  if (kpiBillsOverdue) kpiBillsOverdue.textContent = String(billsOverdueCount);
+
   const driverIncomeTotal = state.motorista
     .filter((registro) => yearMonth(registro.data) === selectedMonth)
     .reduce((sum, registro) => sum + toFiniteNumber(registro.uber) + toFiniteNumber(registro.noventa_nove), 0);
