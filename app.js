@@ -95,7 +95,7 @@ function updateDriverEstimates() {
       est.style.display = "none";
     }
   } else {
-    info.textContent = "Nenhum abastecimento em aberto — lance um abastecimento em Outras Movimentações antes de registrar corridas.";
+    info.textContent = "";
     info.style.color = "#8f1f1f";
     est.style.display = "none";
   }
