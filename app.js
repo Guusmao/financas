@@ -637,15 +637,16 @@ function totals() {
   const saidas = monthlyEntries.filter((entry) => entry.type === "Saída" && !entry.is_internal_transfer).reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
   const saidasDashboard = monthlyEntries.filter((entry) => entry.type === "Saída" && !entry.hide_from_dashboard && !entry.is_internal_transfer).reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
 
-  // Reserva do mês: lançamentos de Reserva + movimentos de reserva do mês
+  // Reserva do mês: lançamentos de Reserva + movimentos de reserva do mês.
+  // Entrada guarda dinheiro na reserva (soma); Saída retira (subtrai).
   const reservaLancamentosMes = monthlyEntries.filter((entry) => entry.type === "Reserva").reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
-  const reservaMovimentosMes = state.reserve.filter((item) => yearMonth(item.date) === selectedMonth).reduce((sum, item) => sum + (item.type === "Saída" ? toFiniteNumber(item.amount) : -toFiniteNumber(item.amount)), 0);
+  const reservaMovimentosMes = state.reserve.filter((item) => yearMonth(item.date) === selectedMonth).reduce((sum, item) => sum + (item.type === "Entrada" ? toFiniteNumber(item.amount) : -toFiniteNumber(item.amount)), 0);
   const reservaMes = reservaLancamentosMes + reservaMovimentosMes;
 
   // Reserva acumulada (todos os tempos)
   const allPaidEntries = state.entries.filter((entry) => entry.paid);
   const reservaLancamentosAcumulado = allPaidEntries.filter((entry) => entry.type === "Reserva").reduce((sum, entry) => sum + toFiniteNumber(entry.amount), 0);
-  const reservaMovimentosAcumulado = state.reserve.reduce((sum, item) => sum + (item.type === "Saída" ? toFiniteNumber(item.amount) : -toFiniteNumber(item.amount)), 0);
+  const reservaMovimentosAcumulado = state.reserve.reduce((sum, item) => sum + (item.type === "Entrada" ? toFiniteNumber(item.amount) : -toFiniteNumber(item.amount)), 0);
   const reservaAcumulada = reservaLancamentosAcumulado + reservaMovimentosAcumulado;
 
   return {
